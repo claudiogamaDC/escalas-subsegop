@@ -1363,25 +1363,11 @@ document.getElementById('show-user-login-from-supervisor').onclick = (e)=>{ e.pr
 
 function sleep_(ms){ return new Promise(r=> setTimeout(r, ms)); }
 
-function showDebugBanner_(msg){
-  try{
-    let el = document.getElementById('debug-banner');
-    if(!el){
-      el = document.createElement('div');
-      el.id = 'debug-banner';
-      el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#1e3a5f;color:#fff;padding:8px 12px;font:11px monospace;white-space:pre-wrap;max-height:30vh;overflow:auto;';
-      (document.body || document.documentElement).appendChild(el);
-    }
-    el.textContent += (el.textContent ? '\n' : '') + msg;
-  }catch(e){ /* nada a fazer */ }
-}
-
 async function populateLoginNameSelect(attempt){
   attempt = attempt || 1;
-  showDebugBanner_('populateLoginNameSelect chamada (tentativa ' + attempt + ')');
   const select = document.getElementById('login-name-select');
   const setorSelect = document.getElementById('login-setor-select');
-  if(!select){ showDebugBanner_('ERRO: elemento login-name-select não encontrado no DOM'); return; }
+  if(!select){ return; }
   const setor = setorSelect ? setorSelect.value : 'subsegop';
   select.innerHTML = '<option value="">Carregando...</option>';
   try{
@@ -1393,10 +1379,8 @@ async function populateLoginNameSelect(attempt){
     const sorted = sortByRank_(people.filter(p=> p && p.name));
     select.innerHTML = '<option value="">-- selecione --</option>' +
       sorted.map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
-    showDebugBanner_('Nomes carregados: ' + sorted.length + ' (setor: ' + setor + '). select.options.length agora = ' + select.options.length);
   }catch(e){
     console.error('Erro ao carregar nomes (tentativa ' + attempt + '):', e);
-    showDebugBanner_('ERRO ao carregar nomes (tentativa ' + attempt + '): ' + (e && e.message ? e.message : String(e)));
     if(attempt < 3){
       // Primeira chamada ao Apps Script após abrir a página pode falhar
       // (cold start) — tenta de novo automaticamente antes de desistir.
@@ -1743,9 +1727,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
 
 // Retoma sessão salva (deve rodar DEPOIS dos listeners de aba acima, senão o clique automático não tem efeito)
 (function resumeSession(){
-  showDebugBanner_('resumeSession rodou');
   const saved = loadSession();
-  showDebugBanner_('loadSession retornou: ' + (saved ? JSON.stringify(saved).slice(0,150) : 'null/vazio'));
   if(saved && saved.role){
     currentRole = saved.role;
     currentGroups = saved.groups || [];
