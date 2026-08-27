@@ -2468,11 +2468,42 @@ async function getSMonth(){
   try{ const r = await window.storage.get(K_S_MONTH, true); return r ? JSON.parse(r.value) : null; }
   catch(e){ return null; }
 }
+// Os tipos de dia salvos ficam amarrados ao mês em que foram configurados.
+// Sem isso, um "Salvar tipos de dia" de um mês antigo (com sexta ainda
+// contando como vermelho, por exemplo) fica preso no armazenamento e
+// continua sendo aplicado por engano num mês novo, mascarando o dia certo.
 async function getSDayTypes(){
-  try{ const r = await window.storage.get(K_S_DAYTYPES, true); return r ? JSON.parse(r.value) : {}; }
+  try{
+    const r = await window.storage.get(K_S_DAYTYPES, true);
+    if(!r) return {};
+    const parsed = JSON.parse(r.value);
+    if(!parsed || typeof parsed !== 'object') return {};
+    const currentMonth = await getSMonth();
+    if(!('types' in parsed)){
+      // Formato antigo (salvo antes da sexta virar tipo próprio, sem mês
+      // associado): sexta-feira sempre era gravada como "vermelho" antes
+      // dessa mudança. Se ainda achar exatamente essa combinação (dia que é
+      // sexta-feira, marcado vermelho), é resquício de antes — descarta só
+      // essa marcação pontual pra deixar o cálculo automático (sexta)
+      // assumir de novo. Qualquer outra marcação manual (indisponível,
+      // preto num dia normal etc.) continua valendo.
+      const cleaned = {};
+      if(currentMonth){
+        Object.keys(parsed).forEach(day=>{
+          const isStaleFridayOverride = parsed[day] === 'vermelho' && sDow_(currentMonth, Number(day)) === 5;
+          if(!isStaleFridayOverride) cleaned[day] = parsed[day];
+        });
+      }
+      return cleaned;
+    }
+    return (parsed.month === currentMonth) ? (parsed.types || {}) : {};
+  }
   catch(e){ return {}; }
 }
-async function setSDayTypes(obj){ await window.storage.set(K_S_DAYTYPES, JSON.stringify(obj), true); }
+async function setSDayTypes(obj){
+  const month = await getSMonth();
+  await window.storage.set(K_S_DAYTYPES, JSON.stringify({month, types: obj}), true);
+}
 async function getSAssignments(){
   try{ const r = await window.storage.get(K_S_ASSIGN, true); return r ? JSON.parse(r.value) : {}; }
   catch(e){ return {}; }
@@ -2500,9 +2531,12 @@ async function getSObs(){
 // Sexta tem cota própria (como o Ordinário no NIIAD) — só Sáb/Dom contam
 // como vermelho. Preto, Sexta e Vermelho são cotas independentes que, somadas,
 // dão o total de dias de serviço da pessoa no mês.
-function sDefaultDayType(month, day){
+function sDow_(month, day){
   const [y,m] = month.split('-').map(Number);
-  const dow = new Date(y, m-1, day).getDay(); // 0=Dom .. 6=Sáb
+  return new Date(y, m-1, day).getDay(); // 0=Dom .. 6=Sáb
+}
+function sDefaultDayType(month, day){
+  const dow = sDow_(month, day);
   if(dow === 5) return 'sexta';
   return (dow === 0 || dow === 6) ? 'vermelho' : 'preto';
 }
