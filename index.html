@@ -1742,8 +1742,16 @@ document.querySelectorAll('.tab').forEach(tab=>{
   });
 });
 
-// Retoma sessão salva (deve rodar DEPOIS dos listeners de aba acima, senão o clique automático não tem efeito)
-(function resumeSession(){
+// Retoma sessão salva (deve rodar DEPOIS dos listeners de aba acima, senão o clique automático não tem efeito).
+// Adiado com setTimeout(0): se a sessão salva reabre direto numa aba de
+// admin (ex.: "Configurar SUBSEGOP"), applyRoleVisibility() chama funções
+// que usam constantes (DAYS, STATUS etc.) só declaradas mais abaixo neste
+// mesmo script — chamando de forma síncrona aqui em cima, ainda no meio do
+// carregamento do script, essas constantes ainda não existem ("Cannot
+// access ... before initialization"). Adiar pro próximo tick garante que o
+// script inteiro já terminou de rodar (todas as consts já inicializadas)
+// antes da sessão ser retomada.
+setTimeout(function resumeSession(){
   const saved = loadSession();
   if(saved && saved.role){
     currentRole = saved.role;
@@ -1757,7 +1765,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
   } else {
     populateLoginNameSelect();
   }
-})();
+}, 0);
 
 function loadPanel(name){
   if(name === 'fill-subsegop') loadFillPanel();
