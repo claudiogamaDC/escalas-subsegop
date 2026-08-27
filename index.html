@@ -957,6 +957,20 @@ async function backendSet(key, value){
   const data = await res.json();
   if(!data.ok) throw new Error(data.error || "erro desconhecido");
 }
+// Busca várias chaves numa única ida ao servidor — usado pelas telas de
+// "escolher serviço", que antes disparavam 5+ chamadas separadas (uma por
+// getRoster/getSDayTypes/getSAssignments/... etc.) só pra montar uma tela.
+async function backendGetBatch(keys){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"get_batch", keys, secret: BACKEND_SECRET })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  const data = await res.json();
+  if(!data.ok) throw new Error(data.error || "erro desconhecido");
+  return data.values;
+}
 
 // Shim: mantém a mesma API que o resto do código já usa (window.storage.get/set),
 // só que agora conversando com o backend do Google Apps Script.
@@ -967,8 +981,26 @@ window.storage = {
   },
   async set(key, value, _isPublic){
     await backendSet(key, value);
+  },
+  // Mesma forma de retorno do get() (objeto {value} por chave, ou null),
+  // só que buscando todas as chaves de uma vez.
+  async getBatch(keys){
+    const raw = await backendGetBatch(keys);
+    const out = {};
+    keys.forEach(k=>{
+      const v = raw[k];
+      out[k] = (v === null || v === undefined) ? null : { value: v };
+    });
+    return out;
   }
 };
+// Lê um valor já buscado em lote (formato {chave: {value:...}|null}), fazendo
+// o mesmo JSON.parse + fallback que os getters individuais já fazem.
+function parseBatchValue_(batch, key, fallback){
+  const r = batch[key];
+  if(!r) return fallback;
+  try{ return JSON.parse(r.value); } catch(e){ return fallback; }
+}
 
 /* ============================================================
    BACKEND: login e senha
@@ -2401,10 +2433,13 @@ document.getElementById('save-roster-btn').onclick = async ()=>{
   try{
     const prevRoster = await getRoster();
     await window.storage.set(K_ROSTER, JSON.stringify(roster), true);
-    for(const p of pendingPasswords){
-      const res = await backendSetPassword(p.name, p.newPassword, currentAdminPassword);
-      if(!res.ok) throw new Error(res.error || 'erro ao definir senha');
-    }
+    // Em paralelo em vez de uma de cada vez — se o admin troca a senha de
+    // várias pessoas junto, isso evita esperar N idas ao servidor em fila.
+    const passwordResults = await Promise.all(
+      pendingPasswords.map(p=> backendSetPassword(p.name, p.newPassword, currentAdminPassword))
+    );
+    const failedPassword = passwordResults.find(res=> !res.ok);
+    if(failedPassword) throw new Error(failedPassword.error || 'erro ao definir senha');
     rows.forEach(r=> r.querySelector('.roster-password-input').value = '');
     logEvent('admin', 'Admin', 'Salvou efetivo SUBSEGOP (' + roster.length + ' pessoas)' + (pendingPasswords.length ? ', ' + pendingPasswords.length + ' senha(s) alterada(s)' : '') + ' — ' + diffRoster_(prevRoster, roster));
     statusEl.style.color = '#22c55e';
@@ -2480,31 +2515,36 @@ async function getSMonth(){
 // Sem isso, um "Salvar tipos de dia" de um mês antigo (com sexta ainda
 // contando como vermelho, por exemplo) fica preso no armazenamento e
 // continua sendo aplicado por engano num mês novo, mascarando o dia certo.
+// Extraído numa função à parte pra poder ser reaproveitado tanto pela
+// leitura avulsa (getSDayTypes) quanto pela leitura em lote (getSBundle_).
+function sFilterDayTypes_(parsed, currentMonth){
+  if(!parsed || typeof parsed !== 'object') return {};
+  if(!('types' in parsed)){
+    // Formato antigo (salvo antes da sexta virar tipo próprio, sem mês
+    // associado): sexta-feira sempre era gravada como "vermelho" antes
+    // dessa mudança. Se ainda achar exatamente essa combinação (dia que é
+    // sexta-feira, marcado vermelho), é resquício de antes — descarta só
+    // essa marcação pontual pra deixar o cálculo automático (sexta)
+    // assumir de novo. Qualquer outra marcação manual (indisponível,
+    // preto num dia normal etc.) continua valendo.
+    const cleaned = {};
+    if(currentMonth){
+      Object.keys(parsed).forEach(day=>{
+        const isStaleFridayOverride = parsed[day] === 'vermelho' && sDow_(currentMonth, Number(day)) === 5;
+        if(!isStaleFridayOverride) cleaned[day] = parsed[day];
+      });
+    }
+    return cleaned;
+  }
+  return (parsed.month === currentMonth) ? (parsed.types || {}) : {};
+}
 async function getSDayTypes(){
   try{
     const r = await window.storage.get(K_S_DAYTYPES, true);
     if(!r) return {};
     const parsed = JSON.parse(r.value);
-    if(!parsed || typeof parsed !== 'object') return {};
     const currentMonth = await getSMonth();
-    if(!('types' in parsed)){
-      // Formato antigo (salvo antes da sexta virar tipo próprio, sem mês
-      // associado): sexta-feira sempre era gravada como "vermelho" antes
-      // dessa mudança. Se ainda achar exatamente essa combinação (dia que é
-      // sexta-feira, marcado vermelho), é resquício de antes — descarta só
-      // essa marcação pontual pra deixar o cálculo automático (sexta)
-      // assumir de novo. Qualquer outra marcação manual (indisponível,
-      // preto num dia normal etc.) continua valendo.
-      const cleaned = {};
-      if(currentMonth){
-        Object.keys(parsed).forEach(day=>{
-          const isStaleFridayOverride = parsed[day] === 'vermelho' && sDow_(currentMonth, Number(day)) === 5;
-          if(!isStaleFridayOverride) cleaned[day] = parsed[day];
-        });
-      }
-      return cleaned;
-    }
-    return (parsed.month === currentMonth) ? (parsed.types || {}) : {};
+    return sFilterDayTypes_(parsed, currentMonth);
   }
   catch(e){ return {}; }
 }
@@ -2534,6 +2574,22 @@ async function setSSkipped(arr){ await window.storage.set(K_S_SKIPPED, JSON.stri
 async function getSObs(){
   try{ const r = await window.storage.get(K_S_OBS, true); return r ? JSON.parse(r.value) : ""; }
   catch(e){ return ""; }
+}
+
+// Junta as leituras que a tela de "Registrar/Escolher dias" precisa numa
+// única ida ao servidor (em vez das 5 chamadas separadas de antes:
+// getRoster + getSDayTypes + getSAssignments + getSSkipped + getSReleased).
+async function getSBundle_(){
+  const batch = await window.storage.getBatch([K_ROSTER, K_S_DAYTYPES, K_S_ASSIGN, K_S_SKIPPED, K_S_RELEASED, K_S_MONTH]);
+  const month = parseBatchValue_(batch, K_S_MONTH, null);
+  return {
+    roster: parseBatchValue_(batch, K_ROSTER, DEFAULT_ROSTER),
+    dayTypes: sFilterDayTypes_(parseBatchValue_(batch, K_S_DAYTYPES, null), month),
+    assignments: parseBatchValue_(batch, K_S_ASSIGN, {}),
+    skipped: parseBatchValue_(batch, K_S_SKIPPED, []),
+    released: parseBatchValue_(batch, K_S_RELEASED, false) === true,
+    month
+  };
 }
 
 // Sexta tem cota própria (como o Ordinário no NIIAD) — só Sáb/Dom contam
@@ -2795,9 +2851,7 @@ async function sSwapUndo_(id){
 /* ---------- SUBSEGOP Serviço Mensal: aba Registrar ---------- */
 async function loadSFillPanel(){
   const isAdmin = currentRole === 'admin';
-  const [month, released, roster] = await Promise.all([
-    getSMonth(), getSReleased(), isAdmin ? getRoster() : Promise.resolve(null)
-  ]);
+  const { month, released, roster } = await getSBundle_();
   document.getElementById('s-month-banner-label').textContent = month ? monthLabel(month) : 'Mês ainda não configurado pelo responsável';
 
   const releaseBanner = document.getElementById('s-release-banner');
@@ -2827,7 +2881,10 @@ async function loadSFillPanel(){
 
 async function renderSCalendarList(){
   const wrap = document.getElementById('s-cal-list');
-  const month = await getSMonth();
+  // Uma única ida ao servidor (em vez de 5 chamadas separadas) pra montar a
+  // tela inteira.
+  const bundle = await getSBundle_();
+  const month = bundle.month;
   if(!month){
     wrap.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aguardando o responsável configurar o mês de referência.</p>';
     document.getElementById('s-turn-text').textContent = '—';
@@ -2835,10 +2892,7 @@ async function renderSCalendarList(){
     return;
   }
   const total = daysInMonth(month);
-  const [rosterRaw, dayTypes, assignments, skipped, released] = await Promise.all([
-    getRoster(), getSDayTypes(), getSAssignments(), getSSkipped(), getSReleased()
-  ]);
-  const roster = rosterRaw;
+  const { roster, dayTypes, assignments, skipped, released } = bundle;
   const isAdmin = currentRole === 'admin';
   const myName = currentUserName;
   const targetName = isAdmin ? document.getElementById('s-admin-target-select').value : myName;
@@ -2924,18 +2978,25 @@ async function renderSCalendarList(){
       const day = btn.dataset.day;
       const name = isAdmin ? document.getElementById('s-admin-target-select').value : myName;
       if(!name){ alert('Selecione a pessoa antes de assumir.'); return; }
-      const check = await validateSPick_(name, day, {roster, dayTypes, month, skipped});
+      // Uma única leitura fresca de liberação + atribuições (as duas coisas
+      // que podem ter mudado desde que a tela foi montada), reaproveitada
+      // tanto pra validar quanto pra gravar — antes eram 3 idas ao servidor
+      // separadas (validar buscava de novo, e depois buscava mais uma vez
+      // pra gravar).
+      const freshBatch = await window.storage.getBatch([K_S_RELEASED, K_S_ASSIGN]);
+      const freshReleased = parseBatchValue_(freshBatch, K_S_RELEASED, false) === true;
+      const freshAssignments = parseBatchValue_(freshBatch, K_S_ASSIGN, {});
+      const check = validateSPick_(name, day, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
-      const fresh = await getSAssignments();
-      const freshSlots = fresh[day] || [];
+      const freshSlots = freshAssignments[day] || [];
       if(freshSlots.length >= 1 || sSlotNames_(freshSlots).includes(name)){
         alert('Essa vaga acabou de mudar. Atualizando a lista...');
         await renderSCalendarList();
         return;
       }
       freshSlots.push(name);
-      fresh[day] = freshSlots;
-      await setSAssignments(fresh);
+      freshAssignments[day] = freshSlots;
+      await setSAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + ' (SUBSEGOP Serviço Mensal)');
       await renderSCalendarList();
     };
@@ -2955,18 +3016,13 @@ async function renderSCalendarList(){
   });
 }
 
-async function validateSPick_(targetName, day, ctx){
+// ctx traz tudo já buscado por quem chamou (roster/dayTypes/month/skipped da
+// renderização + released/assignments frescos do clique) — sem isso, cada
+// clique em "Assumir" disparava mais 2 chamadas ao servidor só pra validar.
+function validateSPick_(targetName, day, ctx){
   const isAdmin = currentRole === 'admin';
-  const [released, assignments, fetched] = await Promise.all([
-    getSReleased(),
-    getSAssignments(),
-    ctx ? Promise.resolve(null) : Promise.all([getRoster(), getSDayTypes(), getSMonth(), getSSkipped()])
-  ]);
+  const { released, assignments, roster, dayTypes, month, skipped } = ctx;
   if(!released && !isAdmin) return {ok:false, error:'O sistema ainda não foi liberado pelo responsável.'};
-  const roster = ctx ? ctx.roster : fetched[0];
-  const dayTypes = ctx ? ctx.dayTypes : fetched[1];
-  const month = ctx ? ctx.month : fetched[2];
-  const skipped = ctx ? ctx.skipped : fetched[3];
 
   if(!isAdmin){
     const turn = computeSTurn(roster, assignments, dayTypes, month, skipped);
@@ -3362,6 +3418,20 @@ async function getCObs(){
   catch(e){ return ""; }
 }
 
+// Junta as leituras da tela de "Registrar Serviço" numa única ida ao
+// servidor (em vez de 5 chamadas separadas).
+async function getCBundle_(){
+  const batch = await window.storage.getBatch([K_C_ROSTER, K_C_DAYTYPES, K_C_ASSIGN, K_C_SKIPPED, K_C_RELEASED, K_C_MONTH]);
+  return {
+    roster: parseBatchValue_(batch, K_C_ROSTER, []).map(normalizeCPerson_),
+    dayTypes: parseBatchValue_(batch, K_C_DAYTYPES, {}),
+    assignments: parseBatchValue_(batch, K_C_ASSIGN, {}),
+    skipped: parseBatchValue_(batch, K_C_SKIPPED, []),
+    released: parseBatchValue_(batch, K_C_RELEASED, false) === true,
+    month: parseBatchValue_(batch, K_C_MONTH, null)
+  };
+}
+
 function cDefaultDayType(month, day){
   const [y,m] = month.split('-').map(Number);
   const dow = new Date(y, m-1, day).getDay(); // 0=Dom .. 6=Sáb
@@ -3592,9 +3662,7 @@ async function cSwapUndo_(id){
 /* ---------- CEMADEN: aba Registrar Serviço ---------- */
 async function loadCFillPanel(){
   const isAdmin = currentRole === 'admin';
-  const [month, released, roster] = await Promise.all([
-    getCMonth(), getCReleased(), isAdmin ? getCRoster() : Promise.resolve(null)
-  ]);
+  const { month, released, roster } = await getCBundle_();
   document.getElementById('c-month-banner-label').textContent = month ? monthLabel(month) : 'Mês ainda não configurado pelo responsável';
 
   const releaseBanner = document.getElementById('c-release-banner');
@@ -3613,7 +3681,7 @@ async function loadCFillPanel(){
     targetCard.style.display = 'block';
     const select = document.getElementById('c-admin-target-select');
     select.innerHTML = '<option value="">-- selecione --</option>' +
-      sortByRank_(roster.map(normalizeCPerson_)).map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
+      sortByRank_(roster).map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
     select.onchange = renderCCalendarList;
   } else {
     targetCard.style.display = 'none';
@@ -3624,7 +3692,8 @@ async function loadCFillPanel(){
 
 async function renderCCalendarList(){
   const wrap = document.getElementById('c-cal-list');
-  const month = await getCMonth();
+  const bundle = await getCBundle_();
+  const month = bundle.month;
   if(!month){
     wrap.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aguardando o responsável configurar o mês de referência.</p>';
     document.getElementById('c-turn-text').textContent = '—';
@@ -3632,10 +3701,7 @@ async function renderCCalendarList(){
     return;
   }
   const total = daysInMonth(month);
-  const [rosterRaw, dayTypes, assignments, skipped, released] = await Promise.all([
-    getCRoster(), getCDayTypes(), getCAssignments(), getCSkipped(), getCReleased()
-  ]);
-  const roster = rosterRaw.map(normalizeCPerson_);
+  const { roster, dayTypes, assignments, skipped, released } = bundle;
   const isAdmin = currentRole === 'admin';
   const myName = currentUserName;
   const targetName = isAdmin ? document.getElementById('c-admin-target-select').value : myName;
@@ -3719,18 +3785,22 @@ async function renderCCalendarList(){
       const day = btn.dataset.day;
       const name = isAdmin ? document.getElementById('c-admin-target-select').value : myName;
       if(!name){ alert('Selecione a pessoa antes de assumir.'); return; }
-      const check = await validateCPick_(name, day, {roster, dayTypes, month, skipped});
+      // Uma única leitura fresca (liberação + atribuições), reaproveitada
+      // tanto pra validar quanto pra gravar.
+      const freshBatch = await window.storage.getBatch([K_C_RELEASED, K_C_ASSIGN]);
+      const freshReleased = parseBatchValue_(freshBatch, K_C_RELEASED, false) === true;
+      const freshAssignments = parseBatchValue_(freshBatch, K_C_ASSIGN, {});
+      const check = validateCPick_(name, day, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
-      const fresh = await getCAssignments();
-      const freshSlots = fresh[day] || [];
+      const freshSlots = freshAssignments[day] || [];
       if(freshSlots.length >= 1 || cSlotNames_(freshSlots).includes(name)){
         alert('Essa vaga acabou de mudar. Atualizando a lista...');
         await renderCCalendarList();
         return;
       }
       freshSlots.push(name);
-      fresh[day] = freshSlots;
-      await setCAssignments(fresh);
+      freshAssignments[day] = freshSlots;
+      await setCAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + ' (CEMADEN)');
       await renderCCalendarList();
     };
@@ -3750,18 +3820,10 @@ async function renderCCalendarList(){
   });
 }
 
-async function validateCPick_(targetName, day, ctx){
+function validateCPick_(targetName, day, ctx){
   const isAdmin = currentRole === 'admin';
-  const [released, assignments, fetched] = await Promise.all([
-    getCReleased(),
-    getCAssignments(),
-    ctx ? Promise.resolve(null) : Promise.all([getCRoster().then(r=>r.map(normalizeCPerson_)), getCDayTypes(), getCMonth(), getCSkipped()])
-  ]);
+  const { released, assignments, roster, dayTypes, month, skipped } = ctx;
   if(!released && !isAdmin) return {ok:false, error:'O sistema ainda não foi liberado pelo responsável.'};
-  const roster = ctx ? ctx.roster : fetched[0];
-  const dayTypes = ctx ? ctx.dayTypes : fetched[1];
-  const month = ctx ? ctx.month : fetched[2];
-  const skipped = ctx ? ctx.skipped : fetched[3];
 
   if(!isAdmin){
     const turn = computeCTurn(roster, assignments, dayTypes, month, skipped);
@@ -4108,10 +4170,13 @@ document.getElementById('c-save-roster-btn').onclick = async ()=>{
   try{
     const prevRoster = (await getCRoster()).map(normalizeCPerson_);
     await window.storage.set(K_C_ROSTER, JSON.stringify(roster), true);
-    for(const p of pendingPasswords){
-      const res = await backendSetPassword(p.name, p.newPassword, currentAdminPassword);
-      if(!res.ok) throw new Error(res.error || 'erro ao definir senha');
-    }
+    // Em paralelo em vez de uma de cada vez — se o admin troca a senha de
+    // várias pessoas junto, isso evita esperar N idas ao servidor em fila.
+    const passwordResults = await Promise.all(
+      pendingPasswords.map(p=> backendSetPassword(p.name, p.newPassword, currentAdminPassword))
+    );
+    const failedPassword = passwordResults.find(res=> !res.ok);
+    if(failedPassword) throw new Error(failedPassword.error || 'erro ao definir senha');
     rows.forEach(r=> r.querySelector('.roster-password-input').value = '');
     logEvent('admin', 'Admin', 'Salvou efetivo CEMADEN (' + roster.length + ' pessoas)' + (pendingPasswords.length ? ', ' + pendingPasswords.length + ' senha(s) alterada(s)' : '') + ' — ' + diffRoster_(prevRoster, roster));
     statusEl.style.color = '#22c55e';
@@ -4184,6 +4249,20 @@ async function setNSkipped(arr){ await window.storage.set(K_N_SKIPPED, JSON.stri
 async function getNObs(){
   try{ const r = await window.storage.get(K_N_OBS, true); return r ? JSON.parse(r.value) : ""; }
   catch(e){ return ""; }
+}
+
+// Junta as leituras da tela de "Escolher meus dias" numa única ida ao
+// servidor (em vez de 5 chamadas separadas).
+async function getNBundle_(){
+  const batch = await window.storage.getBatch([K_N_ROSTER, K_N_DAYTYPES, K_N_ASSIGN, K_N_SKIPPED, K_N_RELEASED, K_N_MONTH]);
+  return {
+    roster: parseBatchValue_(batch, K_N_ROSTER, []),
+    dayTypes: parseBatchValue_(batch, K_N_DAYTYPES, {}),
+    assignments: parseBatchValue_(batch, K_N_ASSIGN, {}),
+    skipped: parseBatchValue_(batch, K_N_SKIPPED, []),
+    released: parseBatchValue_(batch, K_N_RELEASED, false) === true,
+    month: parseBatchValue_(batch, K_N_MONTH, null)
+  };
 }
 
 function nDefaultDayType(month, day){
@@ -4433,9 +4512,7 @@ async function nSwapUndo_(id){
 /* ---------- NIIAD: aba Escolher meus dias ---------- */
 async function loadNFillPanel(){
   const isAdmin = currentRole === 'admin';
-  const [month, released, roster] = await Promise.all([
-    getNMonth(), getNReleased(), isAdmin ? getNRoster() : Promise.resolve(null)
-  ]);
+  const { month, released, roster } = await getNBundle_();
   document.getElementById('n-month-banner-label').textContent = month ? monthLabel(month) : 'Mês ainda não configurado pelo responsável';
 
   const releaseBanner = document.getElementById('n-release-banner');
@@ -4465,7 +4542,8 @@ async function loadNFillPanel(){
 
 async function renderNCalendarList(){
   const wrap = document.getElementById('n-cal-list');
-  const month = await getNMonth();
+  const bundle = await getNBundle_();
+  const month = bundle.month;
   if(!month){
     wrap.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aguardando o responsável configurar o mês de referência.</p>';
     document.getElementById('n-turn-text').textContent = '—';
@@ -4473,9 +4551,7 @@ async function renderNCalendarList(){
     return;
   }
   const total = daysInMonth(month);
-  const [roster, dayTypes, assignments, skipped, released] = await Promise.all([
-    getNRoster(), getNDayTypes(), getNAssignments(), getNSkipped(), getNReleased()
-  ]);
+  const { roster, dayTypes, assignments, skipped, released } = bundle;
   const isAdmin = currentRole === 'admin';
   const myName = currentUserName;
   const targetName = isAdmin ? document.getElementById('n-admin-target-select').value : myName;
@@ -4562,18 +4638,22 @@ async function renderNCalendarList(){
       const choice = await askChoice_('A vaga do dia ' + day + ' conta como o quê pra ' + displayName_(roster.find(p=>p.name===name)||{name}) + '?', 'Ordinário', tipoLabel);
       if(!choice) return;
       const isOrd = choice === 'a';
-      const check = await validateNPick_(name, day, isOrd, {roster, dayTypes, month, skipped});
+      // Uma única leitura fresca (liberação + atribuições), reaproveitada
+      // tanto pra validar quanto pra gravar.
+      const freshBatch = await window.storage.getBatch([K_N_RELEASED, K_N_ASSIGN]);
+      const freshReleased = parseBatchValue_(freshBatch, K_N_RELEASED, false) === true;
+      const freshAssignments = parseBatchValue_(freshBatch, K_N_ASSIGN, {});
+      const check = validateNPick_(name, day, isOrd, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
-      const fresh = await getNAssignments();
-      const freshSlots = fresh[day] || [];
+      const freshSlots = freshAssignments[day] || [];
       if(freshSlots.length >= 2 || nSlotNames_(freshSlots).includes(name)){
         alert('Essa vaga acabou de mudar. Atualizando a lista...');
         await renderNCalendarList();
         return;
       }
       freshSlots.push({name, ord: isOrd});
-      fresh[day] = freshSlots;
-      await setNAssignments(fresh);
+      freshAssignments[day] = freshSlots;
+      await setNAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + (isOrd ? ' (Ordinário)' : ' (' + dayType + ')') + ' (NIIAD)');
       await renderNCalendarList();
     };
@@ -4593,23 +4673,14 @@ async function renderNCalendarList(){
   });
 }
 
-async function validateNPick_(targetName, day, isOrd, ctx){
-  // ctx (opcional) traz roster/dayTypes/month/skipped já buscados por quem
-  // chamou (a tela acabou de renderizar com esses dados) — evita repetir
-  // 4 chamadas ao backend a cada clique. released e assignments são sempre
-  // buscados de novo aqui, pois são os dois que podem ter mudado por outra
-  // pessoa entre a renderização e o clique.
+function validateNPick_(targetName, day, isOrd, ctx){
+  // ctx traz tudo já buscado por quem chamou — roster/dayTypes/month/skipped
+  // da renderização, e released/assignments frescos do próprio clique (os
+  // dois que podem ter mudado por outra pessoa entre a tela e o clique).
+  // Evita repetir chamadas ao backend só pra validar.
   const isAdmin = currentRole === 'admin';
-  const [released, assignments, fetched] = await Promise.all([
-    getNReleased(),
-    getNAssignments(),
-    ctx ? Promise.resolve(null) : Promise.all([getNRoster(), getNDayTypes(), getNMonth(), getNSkipped()])
-  ]);
+  const { released, assignments, roster, dayTypes, month, skipped } = ctx;
   if(!released && !isAdmin) return {ok:false, error:'O sistema ainda não foi liberado pelo responsável.'};
-  const roster = ctx ? ctx.roster : fetched[0];
-  const dayTypes = ctx ? ctx.dayTypes : fetched[1];
-  const month = ctx ? ctx.month : fetched[2];
-  const skipped = ctx ? ctx.skipped : fetched[3];
 
   if(!isAdmin){
     const turn = computeNTurn(roster, assignments, dayTypes, month, skipped);
@@ -4975,10 +5046,13 @@ document.getElementById('n-save-roster-btn').onclick = async ()=>{
   try{
     const prevRoster = await getNRoster();
     await window.storage.set(K_N_ROSTER, JSON.stringify(roster), true);
-    for(const p of pendingPasswords){
-      const res = await backendSetPassword(p.name, p.newPassword, currentAdminPassword);
-      if(!res.ok) throw new Error(res.error || 'erro ao definir senha');
-    }
+    // Em paralelo em vez de uma de cada vez — se o admin troca a senha de
+    // várias pessoas junto, isso evita esperar N idas ao servidor em fila.
+    const passwordResults = await Promise.all(
+      pendingPasswords.map(p=> backendSetPassword(p.name, p.newPassword, currentAdminPassword))
+    );
+    const failedPassword = passwordResults.find(res=> !res.ok);
+    if(failedPassword) throw new Error(failedPassword.error || 'erro ao definir senha');
     rows.forEach(r=> r.querySelector('.roster-password-input').value = '');
     logEvent('admin', 'Admin', 'Salvou efetivo NIIAD (' + roster.length + ' pessoas)' + (pendingPasswords.length ? ', ' + pendingPasswords.length + ' senha(s) alterada(s)' : '') + ' — ' + diffRoster_(prevRoster, roster));
     statusEl.style.color = '#22c55e';
