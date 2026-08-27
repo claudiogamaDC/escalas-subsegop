@@ -469,12 +469,12 @@
     <div class="status" id="s-swap-propose-status"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="s-swap-incoming-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
     <div id="s-swap-incoming-list" style="padding:12px;"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="s-swap-mine-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="s-swap-mine-list" style="padding:12px;"></div>
   </div>
@@ -616,12 +616,12 @@
     <div class="status" id="c-swap-propose-status"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="c-swap-incoming-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
     <div id="c-swap-incoming-list" style="padding:12px;"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="c-swap-mine-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="c-swap-mine-list" style="padding:12px;"></div>
   </div>
@@ -775,12 +775,12 @@
     <div class="status" id="n-swap-propose-status"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="n-swap-incoming-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
     <div id="n-swap-incoming-list" style="padding:12px;"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="n-swap-mine-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="n-swap-mine-list" style="padding:12px;"></div>
   </div>
@@ -1391,6 +1391,20 @@ async function populateLoginNameSelect(attempt){
   }
 }
 document.getElementById('login-setor-select').addEventListener('change', populateLoginNameSelect);
+// Busca a lista de nomes de novo sempre que alguém entrar no campo — evita
+// mostrar uma lista desatualizada se o admin mudou o efetivo enquanto a tela
+// de login já estava aberta (antes só recarregava ao trocar o Setor ou dar
+// F5). Não trava a abertura do campo — só atualiza os dados em segundo
+// plano, prontos pra próxima vez que a pessoa clicar/abrir a lista.
+document.getElementById('login-name-select').addEventListener('focus', ()=>{
+  const select = document.getElementById('login-name-select');
+  const current = select.value;
+  populateLoginNameSelect().then(()=>{
+    if(current && Array.from(select.options).some(o=> o.value === current)){
+      select.value = current;
+    }
+  });
+});
 
 function logout(){
   clearSession();
@@ -2576,6 +2590,11 @@ async function loadSSwapsPanel(){
     };
   }
 
+  // Supervisão não tem identidade pessoal — "pedidos pra mim" e "minhas
+  // propostas" não fazem sentido nesse papel, então ficam escondidos.
+  document.getElementById('s-swap-incoming-wrap').style.display = isSupervisor ? 'none' : '';
+  document.getElementById('s-swap-mine-wrap').style.display = isSupervisor ? 'none' : '';
+
   const incomingEl = document.getElementById('s-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
   incomingEl.innerHTML = swapListHtml_(incoming, 'Nenhum pedido pendente pra você.', req =>
@@ -3378,6 +3397,9 @@ async function loadCSwapsPanel(){
       await loadCSwapsPanel();
     };
   }
+
+  document.getElementById('c-swap-incoming-wrap').style.display = isSupervisor ? 'none' : '';
+  document.getElementById('c-swap-mine-wrap').style.display = isSupervisor ? 'none' : '';
 
   const incomingEl = document.getElementById('c-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
@@ -4214,6 +4236,9 @@ async function loadNSwapsPanel(){
       await loadNSwapsPanel();
     };
   }
+
+  document.getElementById('n-swap-incoming-wrap').style.display = isSupervisor ? 'none' : '';
+  document.getElementById('n-swap-mine-wrap').style.display = isSupervisor ? 'none' : '';
 
   const incomingEl = document.getElementById('n-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
