@@ -472,12 +472,12 @@
     <div class="status" id="s-swap-propose-status"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="s-swap-incoming-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
     <div id="s-swap-incoming-list" style="padding:12px;"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="s-swap-mine-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="s-swap-mine-list" style="padding:12px;"></div>
   </div>
@@ -619,12 +619,12 @@
     <div class="status" id="c-swap-propose-status"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="c-swap-incoming-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
     <div id="c-swap-incoming-list" style="padding:12px;"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="c-swap-mine-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="c-swap-mine-list" style="padding:12px;"></div>
   </div>
@@ -778,12 +778,12 @@
     <div class="status" id="n-swap-propose-status"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="n-swap-incoming-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
     <div id="n-swap-incoming-list" style="padding:12px;"></div>
   </div>
 
-  <div class="schedule-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" id="n-swap-mine-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="n-swap-mine-list" style="padding:12px;"></div>
   </div>
@@ -1366,25 +1366,11 @@ document.getElementById('show-user-login-from-supervisor').onclick = (e)=>{ e.pr
 
 function sleep_(ms){ return new Promise(r=> setTimeout(r, ms)); }
 
-function showDebugBanner_(msg){
-  try{
-    let el = document.getElementById('debug-banner');
-    if(!el){
-      el = document.createElement('div');
-      el.id = 'debug-banner';
-      el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#1e3a5f;color:#fff;padding:8px 12px;font:11px monospace;white-space:pre-wrap;max-height:30vh;overflow:auto;';
-      (document.body || document.documentElement).appendChild(el);
-    }
-    el.textContent += (el.textContent ? '\n' : '') + msg;
-  }catch(e){ /* nada a fazer */ }
-}
-
 async function populateLoginNameSelect(attempt){
   attempt = attempt || 1;
-  showDebugBanner_('populateLoginNameSelect chamada (tentativa ' + attempt + ')');
   const select = document.getElementById('login-name-select');
   const setorSelect = document.getElementById('login-setor-select');
-  if(!select){ showDebugBanner_('ERRO: elemento login-name-select não encontrado no DOM'); return; }
+  if(!select){ return; }
   const setor = setorSelect ? setorSelect.value : 'subsegop';
   select.innerHTML = '<option value="">Carregando...</option>';
   try{
@@ -1396,10 +1382,8 @@ async function populateLoginNameSelect(attempt){
     const sorted = sortByRank_(people.filter(p=> p && p.name));
     select.innerHTML = '<option value="">-- selecione --</option>' +
       sorted.map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
-    showDebugBanner_('Nomes carregados: ' + sorted.length + ' (setor: ' + setor + '). select.options.length agora = ' + select.options.length);
   }catch(e){
     console.error('Erro ao carregar nomes (tentativa ' + attempt + '):', e);
-    showDebugBanner_('ERRO ao carregar nomes (tentativa ' + attempt + '): ' + (e && e.message ? e.message : String(e)));
     if(attempt < 3){
       // Primeira chamada ao Apps Script após abrir a página pode falhar
       // (cold start) — tenta de novo automaticamente antes de desistir.
@@ -1410,6 +1394,20 @@ async function populateLoginNameSelect(attempt){
   }
 }
 document.getElementById('login-setor-select').addEventListener('change', populateLoginNameSelect);
+// Busca a lista de nomes de novo sempre que alguém entrar no campo — evita
+// mostrar uma lista desatualizada se o admin mudou o efetivo enquanto a tela
+// de login já estava aberta (antes só recarregava ao trocar o Setor ou dar
+// F5). Não trava a abertura do campo — só atualiza os dados em segundo
+// plano, prontos pra próxima vez que a pessoa clicar/abrir a lista.
+document.getElementById('login-name-select').addEventListener('focus', ()=>{
+  const select = document.getElementById('login-name-select');
+  const current = select.value;
+  populateLoginNameSelect().then(()=>{
+    if(current && Array.from(select.options).some(o=> o.value === current)){
+      select.value = current;
+    }
+  });
+});
 
 function logout(){
   clearSession();
@@ -1746,9 +1744,7 @@ document.querySelectorAll('.tab').forEach(tab=>{
 
 // Retoma sessão salva (deve rodar DEPOIS dos listeners de aba acima, senão o clique automático não tem efeito)
 (function resumeSession(){
-  showDebugBanner_('resumeSession rodou');
   const saved = loadSession();
-  showDebugBanner_('loadSession retornou: ' + (saved ? JSON.stringify(saved).slice(0,150) : 'null/vazio'));
   if(saved && saved.role){
     currentRole = saved.role;
     currentGroups = saved.groups || [];
@@ -2613,6 +2609,11 @@ async function loadSSwapsPanel(){
     };
   }
 
+  // Supervisão não tem identidade pessoal — "pedidos pra mim" e "minhas
+  // propostas" não fazem sentido nesse papel, então ficam escondidos.
+  document.getElementById('s-swap-incoming-wrap').style.display = isSupervisor ? 'none' : '';
+  document.getElementById('s-swap-mine-wrap').style.display = isSupervisor ? 'none' : '';
+
   const incomingEl = document.getElementById('s-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
   incomingEl.innerHTML = swapListHtml_(incoming, 'Nenhum pedido pendente pra você.', req =>
@@ -3418,6 +3419,9 @@ async function loadCSwapsPanel(){
       await loadCSwapsPanel();
     };
   }
+
+  document.getElementById('c-swap-incoming-wrap').style.display = isSupervisor ? 'none' : '';
+  document.getElementById('c-swap-mine-wrap').style.display = isSupervisor ? 'none' : '';
 
   const incomingEl = document.getElementById('c-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
@@ -4254,6 +4258,9 @@ async function loadNSwapsPanel(){
       await loadNSwapsPanel();
     };
   }
+
+  document.getElementById('n-swap-incoming-wrap').style.display = isSupervisor ? 'none' : '';
+  document.getElementById('n-swap-mine-wrap').style.display = isSupervisor ? 'none' : '';
 
   const incomingEl = document.getElementById('n-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
