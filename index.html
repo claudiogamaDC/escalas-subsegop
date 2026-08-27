@@ -2851,7 +2851,8 @@ async function sSwapUndo_(id){
 /* ---------- SUBSEGOP Serviço Mensal: aba Registrar ---------- */
 async function loadSFillPanel(){
   const isAdmin = currentRole === 'admin';
-  const { month, released, roster } = await getSBundle_();
+  const bundle = await getSBundle_();
+  const { month, released, roster } = bundle;
   document.getElementById('s-month-banner-label').textContent = month ? monthLabel(month) : 'Mês ainda não configurado pelo responsável';
 
   const releaseBanner = document.getElementById('s-release-banner');
@@ -2876,14 +2877,19 @@ async function loadSFillPanel(){
     targetCard.style.display = 'none';
   }
 
-  await renderSCalendarList();
+  // Reaproveita o pacote de dados já buscado acima em vez de buscar tudo
+  // de novo dentro de renderSCalendarList.
+  await renderSCalendarList(bundle);
 }
 
-async function renderSCalendarList(){
+async function renderSCalendarList(preloadedBundle){
   const wrap = document.getElementById('s-cal-list');
-  // Uma única ida ao servidor (em vez de 5 chamadas separadas) pra montar a
-  // tela inteira.
-  const bundle = await getSBundle_();
+  // Se quem chamou já buscou os dados (ex.: loadSFillPanel, ou o próprio
+  // clique de Assumir/Remover que acabou de gravar), reaproveita — só busca
+  // de novo do zero quando ninguém passou nada pronto (troca de aba, troca
+  // do alvo no select do admin etc.). 'month' in x descarta o Event que o
+  // navegador manda quando essa função é usada direto como onchange/onclick.
+  const bundle = (preloadedBundle && ('month' in preloadedBundle)) ? preloadedBundle : await getSBundle_();
   const month = bundle.month;
   if(!month){
     wrap.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aguardando o responsável configurar o mês de referência.</p>';
@@ -2998,7 +3004,9 @@ async function renderSCalendarList(){
       freshAssignments[day] = freshSlots;
       await setSAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + ' (SUBSEGOP Serviço Mensal)');
-      await renderSCalendarList();
+      // Redesenha com os dados que acabamos de gravar, sem buscar tudo de
+      // novo do servidor (roster/dayTypes/skipped não mudam num clique).
+      await renderSCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
     };
   });
 
@@ -3011,7 +3019,7 @@ async function renderSCalendarList(){
       fresh[day] = freshSlots.filter((n,i)=> i !== Number(btn.dataset.slot));
       await setSAssignments(fresh);
       logEvent('preenchimento', currentUserName || removedName, 'Removeu o dia ' + day + ' de ' + removedName + ' (SUBSEGOP Serviço Mensal)');
-      await renderSCalendarList();
+      await renderSCalendarList({roster, dayTypes, month, skipped, released, assignments: fresh});
     };
   });
 }
@@ -3662,7 +3670,8 @@ async function cSwapUndo_(id){
 /* ---------- CEMADEN: aba Registrar Serviço ---------- */
 async function loadCFillPanel(){
   const isAdmin = currentRole === 'admin';
-  const { month, released, roster } = await getCBundle_();
+  const bundle = await getCBundle_();
+  const { month, released, roster } = bundle;
   document.getElementById('c-month-banner-label').textContent = month ? monthLabel(month) : 'Mês ainda não configurado pelo responsável';
 
   const releaseBanner = document.getElementById('c-release-banner');
@@ -3687,12 +3696,12 @@ async function loadCFillPanel(){
     targetCard.style.display = 'none';
   }
 
-  await renderCCalendarList();
+  await renderCCalendarList(bundle);
 }
 
-async function renderCCalendarList(){
+async function renderCCalendarList(preloadedBundle){
   const wrap = document.getElementById('c-cal-list');
-  const bundle = await getCBundle_();
+  const bundle = (preloadedBundle && ('month' in preloadedBundle)) ? preloadedBundle : await getCBundle_();
   const month = bundle.month;
   if(!month){
     wrap.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aguardando o responsável configurar o mês de referência.</p>';
@@ -3802,7 +3811,7 @@ async function renderCCalendarList(){
       freshAssignments[day] = freshSlots;
       await setCAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + ' (CEMADEN)');
-      await renderCCalendarList();
+      await renderCCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
     };
   });
 
@@ -3815,7 +3824,7 @@ async function renderCCalendarList(){
       fresh[day] = freshSlots.filter((n,i)=> i !== Number(btn.dataset.slot));
       await setCAssignments(fresh);
       logEvent('preenchimento', currentUserName || removedName, 'Removeu o dia ' + day + ' de ' + removedName + ' (CEMADEN)');
-      await renderCCalendarList();
+      await renderCCalendarList({roster, dayTypes, month, skipped, released, assignments: fresh});
     };
   });
 }
@@ -4512,7 +4521,8 @@ async function nSwapUndo_(id){
 /* ---------- NIIAD: aba Escolher meus dias ---------- */
 async function loadNFillPanel(){
   const isAdmin = currentRole === 'admin';
-  const { month, released, roster } = await getNBundle_();
+  const bundle = await getNBundle_();
+  const { month, released, roster } = bundle;
   document.getElementById('n-month-banner-label').textContent = month ? monthLabel(month) : 'Mês ainda não configurado pelo responsável';
 
   const releaseBanner = document.getElementById('n-release-banner');
@@ -4537,12 +4547,12 @@ async function loadNFillPanel(){
     targetCard.style.display = 'none';
   }
 
-  await renderNCalendarList();
+  await renderNCalendarList(bundle);
 }
 
-async function renderNCalendarList(){
+async function renderNCalendarList(preloadedBundle){
   const wrap = document.getElementById('n-cal-list');
-  const bundle = await getNBundle_();
+  const bundle = (preloadedBundle && ('month' in preloadedBundle)) ? preloadedBundle : await getNBundle_();
   const month = bundle.month;
   if(!month){
     wrap.innerHTML = '<p style="color:var(--muted);font-size:13px;">Aguardando o responsável configurar o mês de referência.</p>';
@@ -4655,7 +4665,7 @@ async function renderNCalendarList(){
       freshAssignments[day] = freshSlots;
       await setNAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + (isOrd ? ' (Ordinário)' : ' (' + dayType + ')') + ' (NIIAD)');
-      await renderNCalendarList();
+      await renderNCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
     };
   });
 
@@ -4668,7 +4678,7 @@ async function renderNCalendarList(){
       fresh[day] = freshSlots.filter((n,i)=> i !== Number(btn.dataset.slot));
       await setNAssignments(fresh);
       logEvent('preenchimento', currentUserName || (removedSlot && removedSlot.name), 'Removeu o dia ' + day + ' de ' + (removedSlot && removedSlot.name) + ' (NIIAD)');
-      await renderNCalendarList();
+      await renderNCalendarList({roster, dayTypes, month, skipped, released, assignments: fresh});
     };
   });
 }
