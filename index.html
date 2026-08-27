@@ -948,10 +948,15 @@ async function backendGet(key){
   return data.value;
 }
 async function backendSet(key, value){
+  // Chaves só de configuração (efetivo, mês, tipos de dia, liberação, dias
+  // úteis etc.) exigem a senha de admin no servidor — manda ela sempre que
+  // disponível (só existe em memória quando currentRole === 'admin'; pra
+  // quem não é admin fica undefined e o backend recusa se a chave exigir).
+  // Ver ADMIN_ONLY_KEYS no backend.
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"set", key, value, secret: BACKEND_SECRET })
+    body: JSON.stringify({ action:"set", key, value, secret: BACKEND_SECRET, adminPassword: currentAdminPassword || undefined })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
