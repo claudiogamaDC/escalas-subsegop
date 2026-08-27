@@ -2962,8 +2962,8 @@ async function renderSCalendarList(preloadedBundle){
     if(type === 'indisponivel') return false;
     if(!released && !isAdmin) return false;
     if(!isAdmin && (!turn || turn.name !== name)) return false;
-    if(slots.length >= 1) return false;
     const names = sSlotNames_(slots);
+    if(names.length >= 1) return false;
     if(names.includes(name)) return false;
     const prevNames = sSlotNames_(assignments[String(day-1)] || []);
     const nextNames = sSlotNames_(assignments[String(day+1)] || []);
@@ -3015,6 +3015,7 @@ async function renderSCalendarList(preloadedBundle){
   wrap.querySelectorAll('.cal-btn.assign').forEach(btn=>{
     btn.onclick = async ()=>{
       const day = btn.dataset.day;
+      const slotIdx = Number(btn.dataset.slot);
       const name = isAdmin ? document.getElementById('s-admin-target-select').value : myName;
       if(!name){ alert('Selecione a pessoa antes de assumir.'); return; }
       // Uma única leitura fresca de liberação + atribuições (as duas coisas
@@ -3027,13 +3028,15 @@ async function renderSCalendarList(preloadedBundle){
       const freshAssignments = parseBatchValue_(freshBatch, K_S_ASSIGN, {});
       const check = validateSPick_(name, day, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
-      const freshSlots = freshAssignments[day] || [];
-      if(freshSlots.length >= 1 || sSlotNames_(freshSlots).includes(name)){
+      const freshSlots = (freshAssignments[day] || []).slice();
+      if(sSlotNames_(freshSlots).length >= 1 || sSlotNames_(freshSlots).includes(name)){
         alert('Essa vaga acabou de mudar. Atualizando a lista...');
         await renderSCalendarList();
         return;
       }
-      freshSlots.push(name);
+      // Grava na posição específica (não com push) — mantém a vaga estável
+      // caso um dia venha a ter mais de uma posição.
+      freshSlots[slotIdx] = name;
       freshAssignments[day] = freshSlots;
       await setSAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + ' (SUBSEGOP Serviço Mensal)');
@@ -3046,13 +3049,31 @@ async function renderSCalendarList(preloadedBundle){
   wrap.querySelectorAll('.cal-btn.remove').forEach(btn=>{
     btn.onclick = async ()=>{
       const day = btn.dataset.day;
-      const fresh = await getSAssignments();
-      const freshSlots = fresh[day] || [];
-      const removedName = freshSlots[Number(btn.dataset.slot)];
-      fresh[day] = freshSlots.filter((n,i)=> i !== Number(btn.dataset.slot));
-      await setSAssignments(fresh);
+      const slotIdx = Number(btn.dataset.slot);
+      // Mesma leitura fresca de liberação + atribuições que o Assumir usa —
+      // sem isso, um usuário comum conseguia remover a própria vaga mesmo
+      // com o preenchimento bloqueado pelo admin.
+      const freshBatch = await window.storage.getBatch([K_S_RELEASED, K_S_ASSIGN]);
+      const freshReleased = parseBatchValue_(freshBatch, K_S_RELEASED, false) === true;
+      const freshAssignments = parseBatchValue_(freshBatch, K_S_ASSIGN, {});
+      if(!freshReleased && !isAdmin){
+        alert('O sistema está bloqueado para preenchimento pelo responsável. Não é possível remover agora.');
+        return;
+      }
+      const freshSlots = (freshAssignments[day] || []).slice();
+      const removedName = freshSlots[slotIdx];
+      if(!isAdmin && removedName !== myName){
+        alert('Essa vaga acabou de mudar. Atualizando a lista...');
+        await renderSCalendarList();
+        return;
+      }
+      // Mantém a posição da vaga (não usa filter, que reindexaria e, em
+      // dias com mais de uma vaga, trocaria quem aparece na vaga 1/vaga 2).
+      freshSlots[slotIdx] = null;
+      freshAssignments[day] = freshSlots;
+      await setSAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || removedName, 'Removeu o dia ' + day + ' de ' + removedName + ' (SUBSEGOP Serviço Mensal)');
-      await renderSCalendarList({roster, dayTypes, month, skipped, released, assignments: fresh});
+      await renderSCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
     };
   });
 }
@@ -3077,8 +3098,8 @@ function validateSPick_(targetName, day, ctx){
   if(type === 'indisponivel') return {ok:false, error:'Esse dia não está disponível para serviço.'};
 
   const slots = assignments[String(day)] || [];
-  if(slots.length >= 1) return {ok:false, error:'Esse dia já tem a vaga preenchida.'};
   const names = sSlotNames_(slots);
+  if(names.length >= 1) return {ok:false, error:'Esse dia já tem a vaga preenchida.'};
   if(names.includes(targetName)) return {ok:false, error:'Essa pessoa já está escalada nesse dia.'};
 
   const prevNames = sSlotNames_(assignments[String(dayNum-1)] || []);
@@ -3780,8 +3801,8 @@ async function renderCCalendarList(preloadedBundle){
     if(type === 'indisponivel') return false;
     if(!released && !isAdmin) return false;
     if(!isAdmin && (!turn || turn.name !== name)) return false;
-    if(slots.length >= 1) return false;
     const names = cSlotNames_(slots);
+    if(names.length >= 1) return false;
     if(names.includes(name)) return false;
     const prevNames = cSlotNames_(assignments[String(day-1)] || []);
     const nextNames = cSlotNames_(assignments[String(day+1)] || []);
@@ -3832,6 +3853,7 @@ async function renderCCalendarList(preloadedBundle){
   wrap.querySelectorAll('.cal-btn.assign').forEach(btn=>{
     btn.onclick = async ()=>{
       const day = btn.dataset.day;
+      const slotIdx = Number(btn.dataset.slot);
       const name = isAdmin ? document.getElementById('c-admin-target-select').value : myName;
       if(!name){ alert('Selecione a pessoa antes de assumir.'); return; }
       // Uma única leitura fresca (liberação + atribuições), reaproveitada
@@ -3841,13 +3863,15 @@ async function renderCCalendarList(preloadedBundle){
       const freshAssignments = parseBatchValue_(freshBatch, K_C_ASSIGN, {});
       const check = validateCPick_(name, day, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
-      const freshSlots = freshAssignments[day] || [];
-      if(freshSlots.length >= 1 || cSlotNames_(freshSlots).includes(name)){
+      const freshSlots = (freshAssignments[day] || []).slice();
+      if(cSlotNames_(freshSlots).length >= 1 || cSlotNames_(freshSlots).includes(name)){
         alert('Essa vaga acabou de mudar. Atualizando a lista...');
         await renderCCalendarList();
         return;
       }
-      freshSlots.push(name);
+      // Grava na posição específica (não com push) — mantém a vaga estável
+      // caso um dia venha a ter mais de uma posição.
+      freshSlots[slotIdx] = name;
       freshAssignments[day] = freshSlots;
       await setCAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + ' (CEMADEN)');
@@ -3858,13 +3882,31 @@ async function renderCCalendarList(preloadedBundle){
   wrap.querySelectorAll('.cal-btn.remove').forEach(btn=>{
     btn.onclick = async ()=>{
       const day = btn.dataset.day;
-      const fresh = await getCAssignments();
-      const freshSlots = fresh[day] || [];
-      const removedName = freshSlots[Number(btn.dataset.slot)];
-      fresh[day] = freshSlots.filter((n,i)=> i !== Number(btn.dataset.slot));
-      await setCAssignments(fresh);
+      const slotIdx = Number(btn.dataset.slot);
+      // Mesma leitura fresca de liberação + atribuições que o Assumir usa —
+      // sem isso, um usuário comum conseguia remover a própria vaga mesmo
+      // com o preenchimento bloqueado pelo admin.
+      const freshBatch = await window.storage.getBatch([K_C_RELEASED, K_C_ASSIGN]);
+      const freshReleased = parseBatchValue_(freshBatch, K_C_RELEASED, false) === true;
+      const freshAssignments = parseBatchValue_(freshBatch, K_C_ASSIGN, {});
+      if(!freshReleased && !isAdmin){
+        alert('O sistema está bloqueado para preenchimento pelo responsável. Não é possível remover agora.');
+        return;
+      }
+      const freshSlots = (freshAssignments[day] || []).slice();
+      const removedName = freshSlots[slotIdx];
+      if(!isAdmin && removedName !== myName){
+        alert('Essa vaga acabou de mudar. Atualizando a lista...');
+        await renderCCalendarList();
+        return;
+      }
+      // Mantém a posição da vaga (não usa filter, que reindexaria e, em
+      // dias com mais de uma vaga, trocaria quem aparece na vaga 1/vaga 2).
+      freshSlots[slotIdx] = null;
+      freshAssignments[day] = freshSlots;
+      await setCAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || removedName, 'Removeu o dia ' + day + ' de ' + removedName + ' (CEMADEN)');
-      await renderCCalendarList({roster, dayTypes, month, skipped, released, assignments: fresh});
+      await renderCCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
     };
   });
 }
@@ -3886,8 +3928,8 @@ function validateCPick_(targetName, day, ctx){
   if(type === 'indisponivel') return {ok:false, error:'Esse dia não está disponível para serviço.'};
 
   const slots = assignments[String(day)] || [];
-  if(slots.length >= 1) return {ok:false, error:'Esse dia já tem a vaga preenchida.'};
   const names = cSlotNames_(slots);
+  if(names.length >= 1) return {ok:false, error:'Esse dia já tem a vaga preenchida.'};
   if(names.includes(targetName)) return {ok:false, error:'Essa pessoa já está escalada nesse dia.'};
 
   const prevNames = cSlotNames_(assignments[String(dayNum-1)] || []);
@@ -4639,8 +4681,8 @@ async function renderNCalendarList(preloadedBundle){
     if(!name) return false;
     if(!released && !isAdmin) return false;
     if(!isAdmin && (!turn || turn.name !== name)) return false;
-    if(slots.length >= 2) return false;
     const names = nSlotNames_(slots);
+    if(names.length >= 2) return false;
     if(names.includes(name)) return false;
     const prevNames = nSlotNames_(assignments[String(day-1)] || []);
     const nextNames = nSlotNames_(assignments[String(day+1)] || []);
@@ -4686,6 +4728,7 @@ async function renderNCalendarList(preloadedBundle){
   wrap.querySelectorAll('.cal-btn.assign').forEach(btn=>{
     btn.onclick = async ()=>{
       const day = btn.dataset.day;
+      const slotIdx = Number(btn.dataset.slot);
       const name = isAdmin ? document.getElementById('n-admin-target-select').value : myName;
       if(!name){ alert('Selecione a pessoa antes de assumir.'); return; }
       const dayType = nDayType(dayTypes, month, Number(day));
@@ -4700,13 +4743,16 @@ async function renderNCalendarList(preloadedBundle){
       const freshAssignments = parseBatchValue_(freshBatch, K_N_ASSIGN, {});
       const check = validateNPick_(name, day, isOrd, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
-      const freshSlots = freshAssignments[day] || [];
-      if(freshSlots.length >= 2 || nSlotNames_(freshSlots).includes(name)){
+      const freshSlots = (freshAssignments[day] || []).slice();
+      if(nNormalizeSlot_(freshSlots[slotIdx]) || nSlotNames_(freshSlots).includes(name)){
         alert('Essa vaga acabou de mudar. Atualizando a lista...');
         await renderNCalendarList();
         return;
       }
-      freshSlots.push({name, ord: isOrd});
+      // Grava na posição específica (não com push) — sem isso, remover a
+      // Vaga 1 fazia a Vaga 2 "subir" de posição (e um assumir posterior
+      // ocupava a posição errada).
+      freshSlots[slotIdx] = {name, ord: isOrd};
       freshAssignments[day] = freshSlots;
       await setNAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + (isOrd ? ' (Ordinário)' : ' (' + dayType + ')') + ' (NIIAD)');
@@ -4717,13 +4763,31 @@ async function renderNCalendarList(preloadedBundle){
   wrap.querySelectorAll('.cal-btn.remove').forEach(btn=>{
     btn.onclick = async ()=>{
       const day = btn.dataset.day;
-      const fresh = await getNAssignments();
-      const freshSlots = fresh[day] || [];
-      const removedSlot = nNormalizeSlot_(freshSlots[Number(btn.dataset.slot)]);
-      fresh[day] = freshSlots.filter((n,i)=> i !== Number(btn.dataset.slot));
-      await setNAssignments(fresh);
+      const slotIdx = Number(btn.dataset.slot);
+      // Mesma leitura fresca de liberação + atribuições que o Assumir usa —
+      // sem isso, um usuário comum conseguia remover a própria vaga mesmo
+      // com o preenchimento bloqueado pelo admin.
+      const freshBatch = await window.storage.getBatch([K_N_RELEASED, K_N_ASSIGN]);
+      const freshReleased = parseBatchValue_(freshBatch, K_N_RELEASED, false) === true;
+      const freshAssignments = parseBatchValue_(freshBatch, K_N_ASSIGN, {});
+      if(!freshReleased && !isAdmin){
+        alert('O sistema está bloqueado para preenchimento pelo responsável. Não é possível remover agora.');
+        return;
+      }
+      const freshSlots = (freshAssignments[day] || []).slice();
+      const removedSlot = nNormalizeSlot_(freshSlots[slotIdx]);
+      if(!isAdmin && (!removedSlot || removedSlot.name !== myName)){
+        alert('Essa vaga acabou de mudar. Atualizando a lista...');
+        await renderNCalendarList();
+        return;
+      }
+      // Mantém a posição da vaga (não usa filter, que reindexaria e
+      // trocaria quem aparece na vaga 1/vaga 2 — o NIIAD tem 2 vagas/dia).
+      freshSlots[slotIdx] = null;
+      freshAssignments[day] = freshSlots;
+      await setNAssignments(freshAssignments);
       logEvent('preenchimento', currentUserName || (removedSlot && removedSlot.name), 'Removeu o dia ' + day + ' de ' + (removedSlot && removedSlot.name) + ' (NIIAD)');
-      await renderNCalendarList({roster, dayTypes, month, skipped, released, assignments: fresh});
+      await renderNCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
     };
   });
 }
@@ -4745,8 +4809,8 @@ function validateNPick_(targetName, day, isOrd, ctx){
   }
 
   const slots = assignments[String(day)] || [];
-  if(slots.length >= 2) return {ok:false, error:'Esse dia já tem as 2 vagas preenchidas.'};
   const names = nSlotNames_(slots);
+  if(names.length >= 2) return {ok:false, error:'Esse dia já tem as 2 vagas preenchidas.'};
   if(names.includes(targetName)) return {ok:false, error:'Essa pessoa já está escalada nesse dia.'};
 
   const dayNum = Number(day);
