@@ -2579,8 +2579,12 @@ async function getSObs(){
 // Junta as leituras que a tela de "Registrar/Escolher dias" precisa numa
 // única ida ao servidor (em vez das 5 chamadas separadas de antes:
 // getRoster + getSDayTypes + getSAssignments + getSSkipped + getSReleased).
+// Serve tanto a aba de Registrar/Escolher dias quanto a Escala Compilada —
+// como a leitura em lote já traz tudo do armazenamento de uma vez (custo
+// igual buscar 6 chaves ou 8), incluir obs/swaps aqui não deixa a chamada
+// mais lenta e evita a Escala Compilada precisar de uma leitura separada.
 async function getSBundle_(){
-  const batch = await window.storage.getBatch([K_ROSTER, K_S_DAYTYPES, K_S_ASSIGN, K_S_SKIPPED, K_S_RELEASED, K_S_MONTH]);
+  const batch = await window.storage.getBatch([K_ROSTER, K_S_DAYTYPES, K_S_ASSIGN, K_S_SKIPPED, K_S_RELEASED, K_S_MONTH, K_S_OBS, K_S_SWAPS]);
   const month = parseBatchValue_(batch, K_S_MONTH, null);
   return {
     roster: parseBatchValue_(batch, K_ROSTER, DEFAULT_ROSTER),
@@ -2588,6 +2592,8 @@ async function getSBundle_(){
     assignments: parseBatchValue_(batch, K_S_ASSIGN, {}),
     skipped: parseBatchValue_(batch, K_S_SKIPPED, []),
     released: parseBatchValue_(batch, K_S_RELEASED, false) === true,
+    obs: parseBatchValue_(batch, K_S_OBS, ""),
+    swaps: parseBatchValue_(batch, K_S_SWAPS, []),
     month
   };
 }
@@ -3072,7 +3078,9 @@ async function loadSCompiled(){
   const canExport = currentRole === 'admin' || currentLevels.subsegop === 'responsavel';
   document.getElementById('s-export-btn').style.display = canExport ? '' : 'none';
   document.getElementById('s-export-csv-btn').style.display = canExport ? '' : 'none';
-  const [month, obs] = await Promise.all([getSMonth(), getSObs()]);
+  // Uma única ida ao servidor (em vez de 2 chamadas Promise.all separadas)
+  // pra montar a Escala Compilada inteira.
+  const { month, obs, roster, dayTypes, assignments, swaps } = await getSBundle_();
   document.getElementById('s-range-label').textContent = month ? monthLabel(month) : 'mês não configurado';
 
   const table = document.getElementById('s-sched-table');
@@ -3083,8 +3091,6 @@ async function loadSCompiled(){
     return;
   }
   const total = daysInMonth(month);
-  const [rosterRaw, dayTypes, assignments, swaps] = await Promise.all([getRoster(), getSDayTypes(), getSAssignments(), getSSwaps()]);
-  const roster = rosterRaw;
   const swappedByDay_ = swappedNamesByDay_(swaps);
 
   const filledCount = Object.keys(assignments).filter(d=> (assignments[d]||[]).length > 0).length;
@@ -3426,16 +3432,19 @@ async function getCObs(){
   catch(e){ return ""; }
 }
 
-// Junta as leituras da tela de "Registrar Serviço" numa única ida ao
-// servidor (em vez de 5 chamadas separadas).
+// Serve tanto a tela de "Registrar Serviço" quanto a Escala Compilada —
+// incluir obs/swaps aqui não deixa a chamada mais lenta (a leitura em lote
+// já traz tudo do armazenamento de uma vez) e evita uma leitura separada.
 async function getCBundle_(){
-  const batch = await window.storage.getBatch([K_C_ROSTER, K_C_DAYTYPES, K_C_ASSIGN, K_C_SKIPPED, K_C_RELEASED, K_C_MONTH]);
+  const batch = await window.storage.getBatch([K_C_ROSTER, K_C_DAYTYPES, K_C_ASSIGN, K_C_SKIPPED, K_C_RELEASED, K_C_MONTH, K_C_OBS, K_C_SWAPS]);
   return {
     roster: parseBatchValue_(batch, K_C_ROSTER, []).map(normalizeCPerson_),
     dayTypes: parseBatchValue_(batch, K_C_DAYTYPES, {}),
     assignments: parseBatchValue_(batch, K_C_ASSIGN, {}),
     skipped: parseBatchValue_(batch, K_C_SKIPPED, []),
     released: parseBatchValue_(batch, K_C_RELEASED, false) === true,
+    obs: parseBatchValue_(batch, K_C_OBS, ""),
+    swaps: parseBatchValue_(batch, K_C_SWAPS, []),
     month: parseBatchValue_(batch, K_C_MONTH, null)
   };
 }
@@ -3875,7 +3884,9 @@ async function loadCCompiled(){
   const canExport = currentRole === 'admin' || currentLevels.cemaden === 'responsavel';
   document.getElementById('c-export-btn').style.display = canExport ? '' : 'none';
   document.getElementById('c-export-csv-btn').style.display = canExport ? '' : 'none';
-  const [month, obs] = await Promise.all([getCMonth(), getCObs()]);
+  // Uma única ida ao servidor (em vez de 2 chamadas Promise.all separadas)
+  // pra montar a Escala Compilada inteira.
+  const { month, obs, roster, dayTypes, assignments, swaps } = await getCBundle_();
   document.getElementById('c-range-label').textContent = month ? monthLabel(month) : 'mês não configurado';
 
   const table = document.getElementById('c-sched-table');
@@ -3886,8 +3897,6 @@ async function loadCCompiled(){
     return;
   }
   const total = daysInMonth(month);
-  const [rosterRaw, dayTypes, assignments, swaps] = await Promise.all([getCRoster(), getCDayTypes(), getCAssignments(), getCSwaps()]);
-  const roster = rosterRaw.map(normalizeCPerson_);
   const swappedByDay_ = swappedNamesByDay_(swaps);
 
   const filledCount = Object.keys(assignments).filter(d=> (assignments[d]||[]).length > 0).length;
@@ -4262,14 +4271,19 @@ async function getNObs(){
 
 // Junta as leituras da tela de "Escolher meus dias" numa única ida ao
 // servidor (em vez de 5 chamadas separadas).
+// Serve tanto a tela de "Escolher meus dias" quanto a Escala Compilada —
+// incluir obs/swaps aqui não deixa a chamada mais lenta (a leitura em lote
+// já traz tudo do armazenamento de uma vez) e evita uma leitura separada.
 async function getNBundle_(){
-  const batch = await window.storage.getBatch([K_N_ROSTER, K_N_DAYTYPES, K_N_ASSIGN, K_N_SKIPPED, K_N_RELEASED, K_N_MONTH]);
+  const batch = await window.storage.getBatch([K_N_ROSTER, K_N_DAYTYPES, K_N_ASSIGN, K_N_SKIPPED, K_N_RELEASED, K_N_MONTH, K_N_OBS, K_N_SWAPS]);
   return {
     roster: parseBatchValue_(batch, K_N_ROSTER, []),
     dayTypes: parseBatchValue_(batch, K_N_DAYTYPES, {}),
     assignments: parseBatchValue_(batch, K_N_ASSIGN, {}),
     skipped: parseBatchValue_(batch, K_N_SKIPPED, []),
     released: parseBatchValue_(batch, K_N_RELEASED, false) === true,
+    obs: parseBatchValue_(batch, K_N_OBS, ""),
+    swaps: parseBatchValue_(batch, K_N_SWAPS, []),
     month: parseBatchValue_(batch, K_N_MONTH, null)
   };
 }
@@ -4738,7 +4752,9 @@ async function loadNCompiled(){
   const canExport = currentRole === 'admin' || currentLevels.niiad === 'responsavel';
   document.getElementById('n-export-btn').style.display = canExport ? '' : 'none';
   document.getElementById('n-export-csv-btn').style.display = canExport ? '' : 'none';
-  const [month, obs] = await Promise.all([getNMonth(), getNObs()]);
+  // Uma única ida ao servidor (em vez de 2 chamadas Promise.all separadas)
+  // pra montar a Escala Compilada inteira.
+  const { month, obs, roster, dayTypes, assignments, swaps } = await getNBundle_();
   document.getElementById('n-range-label').textContent = month ? monthLabel(month) : 'mês não configurado';
 
   const table = document.getElementById('n-sched-table');
@@ -4749,7 +4765,6 @@ async function loadNCompiled(){
     return;
   }
   const total = daysInMonth(month);
-  const [roster, dayTypes, assignments, swaps] = await Promise.all([getNRoster(), getNDayTypes(), getNAssignments(), getNSwaps()]);
   const swappedByDay_ = swappedNamesByDay_(swaps);
 
   const filledCount = Object.keys(assignments).filter(d=> (assignments[d]||[]).length > 0).length;
