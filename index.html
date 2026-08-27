@@ -1934,11 +1934,29 @@ async function setActiveDays(arr){
   await window.storage.set(K_ACTIVE_DAYS, JSON.stringify(arr), true);
 }
 
+// Junta as leituras da Escala Expediente (Marcar + Compilada) numa única
+// ida ao servidor. Guardado também num cache de módulo (expedienteCache_)
+// pra updatePreview() não precisar buscar tudo de novo a cada clique de
+// status — antes, CADA clique em Expediente/Serviço/Férias/Folga/Externa
+// disparava 4 chamadas ao backend só pra redesenhar a prévia.
+let expedienteCache_ = null;
+async function getExpedienteBundle_(){
+  const batch = await window.storage.getBatch([K_WEEK, K_RELEASED, K_ROSTER, K_CHOICES, K_ACTIVE_DAYS, K_OBS]);
+  const bundle = {
+    weekStart: parseBatchValue_(batch, K_WEEK, null),
+    released: parseBatchValue_(batch, K_RELEASED, false) === true,
+    roster: parseBatchValue_(batch, K_ROSTER, DEFAULT_ROSTER),
+    choices: parseBatchValue_(batch, K_CHOICES, {}),
+    activeDays: parseBatchValue_(batch, K_ACTIVE_DAYS, [...DAYS]),
+    obs: parseBatchValue_(batch, K_OBS, "")
+  };
+  expedienteCache_ = bundle;
+  return bundle;
+}
+
 /* ---------- SUBSEGOP: aba Marcar ---------- */
 async function loadFillPanel(){
-  const [weekStart, released, roster, activeDays] = await Promise.all([
-    getWeekStart(), getReleased(), getRoster(), getActiveDays()
-  ]);
+  const { weekStart, released, roster, activeDays } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
   const bannerEl = document.getElementById('week-banner-range');
   if(bannerEl){
@@ -2017,7 +2035,11 @@ async function loadFillPanel(){
   select.onchange = async ()=>{
     const name = select.value;
     if(!name) return;
+    // Busca fresco só aqui (troca de pessoa é pouco frequente, ao contrário
+    // dos cliques de status) pra não mostrar dado desatualizado de alguém
+    // que acabou de salvar. Atualiza o cache também.
     const choices = await getChoices();
+    if(expedienteCache_) expedienteCache_.choices = choices;
     const existing = choices[name] || {};
     rowsWrap.querySelectorAll('.status-btns').forEach(group=>{
       const day = group.dataset.day;
@@ -2039,9 +2061,11 @@ async function loadFillPanel(){
 async function updatePreview(){
   const select = document.getElementById('name-select');
   const name = select ? select.value : '';
-  const [roster, choices, weekStart, activeDays] = await Promise.all([
-    getRoster(), getChoices(), getWeekStart(), getActiveDays()
-  ]);
+  // Reaproveita o que já foi buscado quando a aba abriu (loadFillPanel) em
+  // vez de buscar tudo de novo — updatePreview() roda a cada clique num
+  // botão de status, então isso é o que mais evita chamadas ao servidor.
+  const bundle = expedienteCache_ || await getExpedienteBundle_();
+  const { roster, choices, weekStart, activeDays } = bundle;
   const dates = getWeekDates(weekStart);
   const dayEntries = buildDayEntries(dates, activeDays);
   const table = document.getElementById('preview-table');
@@ -2084,7 +2108,12 @@ async function updatePreview(){
 document.getElementById('save-btn').onclick = async ()=>{
   const name = document.getElementById('name-select').value;
   const statusEl = document.getElementById('status');
-  const released = await getReleased();
+  // Uma única leitura fresca das 3 coisas que importam checar/mesclar bem
+  // na hora de salvar (liberação, dias úteis e as escolhas de todo mundo —
+  // essa última precisa ser fresca mesmo, senão salvar por cima apaga o que
+  // outra pessoa acabou de gravar entretanto).
+  const freshBatch = await window.storage.getBatch([K_RELEASED, K_ACTIVE_DAYS, K_CHOICES]);
+  const released = parseBatchValue_(freshBatch, K_RELEASED, false) === true;
   if(!released && currentRole !== 'admin'){
     statusEl.style.color = '#f87171';
     statusEl.textContent = 'O sistema ainda não foi liberado pelo responsável. Aguarde a liberação para salvar.';
@@ -2098,7 +2127,7 @@ document.getElementById('save-btn').onclick = async ()=>{
   const btn = document.getElementById('save-btn');
   btn.disabled = true;
   try{
-    const activeDays = await getActiveDays();
+    const activeDays = parseBatchValue_(freshBatch, K_ACTIVE_DAYS, [...DAYS]);
     let autoFilled = false;
     ALL_DAYS.forEach(day=>{
       const isWeekend = WEEKEND_DAYS.includes(day);
@@ -2108,9 +2137,10 @@ document.getElementById('save-btn').onclick = async ()=>{
         autoFilled = true;
       }
     });
-    const choices = await getChoices();
+    const choices = parseBatchValue_(freshBatch, K_CHOICES, {});
     choices[name] = currentSelection;
     await window.storage.set(K_CHOICES, JSON.stringify(choices), true);
+    if(expedienteCache_) expedienteCache_.choices = choices; // evita updatePreview() buscar de novo
     logEvent('preenchimento', currentUserName || name, 'Salvou escala semanal de ' + name + ' (SUBSEGOP)');
     statusEl.style.color = '#22c55e';
     statusEl.textContent = autoFilled
@@ -2139,9 +2169,7 @@ async function loadCompiled(){
   const canExport = currentRole === 'admin' || currentLevels.subsegop === 'responsavel';
   document.getElementById('export-btn').style.display = canExport ? '' : 'none';
   document.getElementById('export-csv-btn').style.display = canExport ? '' : 'none';
-  const [roster, choices, weekStart, obs, activeDays] = await Promise.all([
-    getRoster(), getChoices(), getWeekStart(), getObs(), getActiveDays()
-  ]);
+  const { roster, choices, weekStart, obs, activeDays } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
   const dayEntries = buildDayEntries(dates, activeDays);
 
@@ -2231,11 +2259,8 @@ async function downloadXLSX_(filename, sheetName, rows){
 }
 
 document.getElementById('export-csv-btn').onclick = async ()=>{
-  const roster = await getRoster();
-  const choices = await getChoices();
-  const weekStart = await getWeekStart();
+  const { roster, choices, weekStart, activeDays } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
-  const activeDays = await getActiveDays();
   const dayEntries = buildDayEntries(dates, activeDays);
 
   const header = ['Categoria', 'Nome', ...dayEntries.map(e =>
@@ -2293,9 +2318,7 @@ async function wireSupervisorPasswordCard_(setor){
 /* ---------- SUBSEGOP: aba Configurar (admin) ---------- */
 async function loadRosterPanel(){
   wireSupervisorPasswordCard_('subsegop');
-  const [weekStart, released, activeDays, roster] = await Promise.all([
-    getWeekStart(), getReleased(), getActiveDays(), getRoster()
-  ]);
+  const { weekStart, released, activeDays, roster } = await getExpedienteBundle_();
   const weekInput = document.getElementById('week-start');
   weekInput.value = weekStart ? weekStart : getNextMondayISO();
 
@@ -2668,7 +2691,7 @@ async function setSSwaps(list){ return setSwapList_(K_S_SWAPS, list); }
 async function loadSSwapsPanel(){
   const isAdmin = currentRole === 'admin';
   const isSupervisor = currentRole === 'supervisor';
-  const month = await getSMonth();
+  const { month, roster, assignments, swaps } = await getSBundle_();
   if(!month){
     document.getElementById('s-swap-propose-card').style.display = 'none';
     document.getElementById('s-swap-incoming-list').innerHTML = '<p style="color:var(--muted);font-size:13px;">Aguardando o responsável configurar o mês de referência.</p>';
@@ -2676,7 +2699,6 @@ async function loadSSwapsPanel(){
     document.getElementById('s-swap-admin-wrap').style.display = 'none';
     return;
   }
-  const [roster, assignments, swaps] = await Promise.all([getRoster(), getSAssignments(), getSSwaps()]);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
 
   document.getElementById('s-swap-propose-card').style.display = (isAdmin || isSupervisor) ? 'none' : 'block';
@@ -3179,27 +3201,36 @@ document.getElementById('s-export-csv-btn').onclick = async ()=>{
 
 /* ---------- SUBSEGOP Serviço Mensal: aba Configurar (admin) ---------- */
 async function loadSAdminPanel(){
-  const month = await getSMonth();
+  const bundle = await getSBundle_();
+  const { month, released } = bundle;
   const monthInput = document.getElementById('s-month-input');
   monthInput.value = month ? month : getNextMonthISO();
 
-  const released = await getSReleased();
   updateSReleaseAdminUI(released);
 
-  await Promise.all([renderSDayTypesEditor(), renderSTurnAdmin()]);
+  await Promise.all([renderSDayTypesEditor(bundle), renderSTurnAdmin(bundle)]);
 
   monthInput.onchange = renderSDayTypesEditor;
 }
 
-async function renderSDayTypesEditor(){
+// preloadedBundle (opcional): evita buscar tudo de novo quando quem chama
+// (loadSAdminPanel) já buscou um pacote cujo mês bate com o que está no
+// campo — só é reaproveitado se o mês combinar, senão busca fresco (ex.:
+// quando o próprio campo de mês muda, via monthInput.onchange).
+async function renderSDayTypesEditor(preloadedBundle){
   const monthInput = document.getElementById('s-month-input');
   const monthVal = monthInput.value;
   const wrap = document.getElementById('s-daytypes-list');
   wrap.innerHTML = '';
   if(!monthVal) return;
   const total = daysInMonth(monthVal);
-  const savedMonth = await getSMonth();
-  const dayTypes = (savedMonth === monthVal) ? await getSDayTypes() : {};
+  let dayTypes;
+  if(preloadedBundle && preloadedBundle.month === monthVal){
+    dayTypes = preloadedBundle.dayTypes;
+  } else {
+    const savedMonth = await getSMonth();
+    dayTypes = (savedMonth === monthVal) ? await getSDayTypes() : {};
+  }
 
   const CYCLE = ['preto', 'sexta', 'vermelho', 'indisponivel'];
   const COLORS = { preto:'#111827', sexta:'#9333ea', vermelho:'#b91c1c', indisponivel:'#f59e0b' };
@@ -3274,11 +3305,9 @@ document.getElementById('s-toggle-release-btn').onclick = async ()=>{
   setTimeout(()=> statusEl.textContent='', 4000);
 };
 
-async function renderSTurnAdmin(){
-  const [rosterRaw, assignments, dayTypes, month, skipped] = await Promise.all([
-    getRoster(), getSAssignments(), getSDayTypes(), getSMonth(), getSSkipped()
-  ]);
-  const roster = rosterRaw;
+async function renderSTurnAdmin(preloadedBundle){
+  const bundle = (preloadedBundle && ('month' in preloadedBundle)) ? preloadedBundle : await getSBundle_();
+  const { roster, assignments, dayTypes, month, skipped } = bundle;
   const turn = computeSTurn(roster, assignments, dayTypes, month, skipped);
   const el = document.getElementById('s-turn-admin-text');
   if(!turn){
@@ -3291,10 +3320,7 @@ async function renderSTurnAdmin(){
 document.getElementById('s-skip-turn-btn').onclick = async ()=>{
   const statusEl = document.getElementById('s-turn-admin-status');
   try{
-    const [rosterRaw, assignments, dayTypes, month, skipped] = await Promise.all([
-      getRoster(), getSAssignments(), getSDayTypes(), getSMonth(), getSSkipped()
-    ]);
-    const roster = rosterRaw;
+    const { roster, assignments, dayTypes, month, skipped } = await getSBundle_();
     const turn = computeSTurn(roster, assignments, dayTypes, month, skipped);
     if(!turn){
       statusEl.style.color = '#f87171';
