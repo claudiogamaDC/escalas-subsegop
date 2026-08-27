@@ -3198,11 +3198,9 @@ document.getElementById('s-export-btn').onclick = async ()=>{
 };
 
 document.getElementById('s-export-csv-btn').onclick = async ()=>{
-  const month = await getSMonth();
+  const { month, roster, dayTypes, assignments } = await getSBundle_();
   if(!month){ alert('Configure o mês de referência antes de exportar.'); return; }
   const total = daysInMonth(month);
-  const [rosterRaw, dayTypes, assignments] = await Promise.all([getRoster(), getSDayTypes(), getSAssignments()]);
-  const roster = rosterRaw;
   const rows = [['Dia', 'Tipo', 'Serviço Mensal']];
   for(let day=1; day<=total; day++){
     const type = sDayType(dayTypes, month, day);
@@ -3556,7 +3554,7 @@ async function setCSwaps(list){ return setSwapList_(K_C_SWAPS, list); }
 async function loadCSwapsPanel(){
   const isAdmin = currentRole === 'admin';
   const isSupervisor = currentRole === 'supervisor';
-  const month = await getCMonth();
+  const { month, roster, assignments, swaps } = await getCBundle_();
   if(!month){
     document.getElementById('c-swap-propose-card').style.display = 'none';
     document.getElementById('c-swap-incoming-list').innerHTML = '<p style="color:var(--muted);font-size:13px;">Aguardando o responsável configurar o mês de referência.</p>';
@@ -3564,9 +3562,6 @@ async function loadCSwapsPanel(){
     document.getElementById('c-swap-admin-wrap').style.display = 'none';
     return;
   }
-  const [roster, assignments, swaps] = await Promise.all([
-    getCRoster().then(r=> r.map(normalizeCPerson_)), getCAssignments(), getCSwaps()
-  ]);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
 
   document.getElementById('c-swap-propose-card').style.display = (isAdmin || isSupervisor) ? 'none' : 'block';
@@ -4027,11 +4022,9 @@ document.getElementById('c-export-btn').onclick = async ()=>{
 };
 
 document.getElementById('c-export-csv-btn').onclick = async ()=>{
-  const month = await getCMonth();
+  const { month, roster, dayTypes, assignments } = await getCBundle_();
   if(!month){ alert('Configure o mês de referência antes de exportar.'); return; }
   const total = daysInMonth(month);
-  const [rosterRaw, dayTypes, assignments] = await Promise.all([getCRoster(), getCDayTypes(), getCAssignments()]);
-  const roster = rosterRaw.map(normalizeCPerson_);
   const rows = [['Dia', 'Tipo', 'Of de Ligação']];
   for(let day=1; day<=total; day++){
     const type = cDayType(dayTypes, month, day);
@@ -4057,31 +4050,39 @@ document.getElementById('c-export-csv-btn').onclick = async ()=>{
 /* ---------- CEMADEN: aba Configurar (admin) ---------- */
 async function loadCAdminPanel(){
   wireSupervisorPasswordCard_('cemaden');
-  const month = await getCMonth();
+  const bundle = await getCBundle_();
+  const { month, released, roster } = bundle;
   const monthInput = document.getElementById('c-month-input');
   monthInput.value = month ? month : getNextMonthISO();
 
-  const [released, roster] = await Promise.all([getCReleased(), getCRoster()]);
   updateCReleaseAdminUI(released);
 
-  await Promise.all([renderCDayTypesEditor(), renderCTurnAdmin()]);
+  await Promise.all([renderCDayTypesEditor(bundle), renderCTurnAdmin(bundle)]);
 
   const listEl = document.getElementById('c-roster-list');
   listEl.innerHTML = '';
-  sortByRank_(roster.map(normalizeCPerson_)).forEach(p => addCRosterRow(p.name, p.level, p.rank, p.quotaPreto, p.quotaVermelho));
+  sortByRank_(roster).forEach(p => addCRosterRow(p.name, p.level, p.rank, p.quotaPreto, p.quotaVermelho));
 
   monthInput.onchange = renderCDayTypesEditor;
 }
 
-async function renderCDayTypesEditor(){
+// preloadedBundle (opcional): reaproveita o que loadCAdminPanel já buscou,
+// desde que o mês combine com o que está no campo (senão busca fresco —
+// ex.: quando o próprio campo de mês muda).
+async function renderCDayTypesEditor(preloadedBundle){
   const monthInput = document.getElementById('c-month-input');
   const monthVal = monthInput.value;
   const wrap = document.getElementById('c-daytypes-list');
   wrap.innerHTML = '';
   if(!monthVal) return;
   const total = daysInMonth(monthVal);
-  const savedMonth = await getCMonth();
-  const dayTypes = (savedMonth === monthVal) ? await getCDayTypes() : {};
+  let dayTypes;
+  if(preloadedBundle && preloadedBundle.month === monthVal){
+    dayTypes = preloadedBundle.dayTypes;
+  } else {
+    const savedMonth = await getCMonth();
+    dayTypes = (savedMonth === monthVal) ? await getCDayTypes() : {};
+  }
 
   const CYCLE = ['preto', 'vermelho', 'indisponivel'];
   const COLORS = { preto:'#111827', vermelho:'#b91c1c', indisponivel:'#f59e0b' };
@@ -4156,11 +4157,9 @@ document.getElementById('c-toggle-release-btn').onclick = async ()=>{
   setTimeout(()=> statusEl.textContent='', 4000);
 };
 
-async function renderCTurnAdmin(){
-  const [rosterRaw, assignments, dayTypes, month, skipped] = await Promise.all([
-    getCRoster(), getCAssignments(), getCDayTypes(), getCMonth(), getCSkipped()
-  ]);
-  const roster = rosterRaw.map(normalizeCPerson_);
+async function renderCTurnAdmin(preloadedBundle){
+  const bundle = (preloadedBundle && ('month' in preloadedBundle)) ? preloadedBundle : await getCBundle_();
+  const { roster, assignments, dayTypes, month, skipped } = bundle;
   const turn = computeCTurn(roster, assignments, dayTypes, month, skipped);
   const el = document.getElementById('c-turn-admin-text');
   if(!turn){
@@ -4173,10 +4172,7 @@ async function renderCTurnAdmin(){
 document.getElementById('c-skip-turn-btn').onclick = async ()=>{
   const statusEl = document.getElementById('c-turn-admin-status');
   try{
-    const [rosterRaw, assignments, dayTypes, month, skipped] = await Promise.all([
-      getCRoster(), getCAssignments(), getCDayTypes(), getCMonth(), getCSkipped()
-    ]);
-    const roster = rosterRaw.map(normalizeCPerson_);
+    const { roster, assignments, dayTypes, month, skipped } = await getCBundle_();
     const turn = computeCTurn(roster, assignments, dayTypes, month, skipped);
     if(!turn){
       statusEl.style.color = '#f87171';
@@ -4433,7 +4429,7 @@ async function setNSwaps(list){ return setSwapList_(K_N_SWAPS, list); }
 async function loadNSwapsPanel(){
   const isAdmin = currentRole === 'admin';
   const isSupervisor = currentRole === 'supervisor';
-  const month = await getNMonth();
+  const { month, roster, assignments, swaps } = await getNBundle_();
   if(!month){
     document.getElementById('n-swap-propose-card').style.display = 'none';
     document.getElementById('n-swap-incoming-list').innerHTML = '<p style="color:var(--muted);font-size:13px;">Aguardando o responsável configurar o mês de referência.</p>';
@@ -4441,7 +4437,6 @@ async function loadNSwapsPanel(){
     document.getElementById('n-swap-admin-wrap').style.display = 'none';
     return;
   }
-  const [roster, assignments, swaps] = await Promise.all([getNRoster(), getNAssignments(), getNSwaps()]);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
 
   document.getElementById('n-swap-propose-card').style.display = (isAdmin || isSupervisor) ? 'none' : 'block';
@@ -4929,12 +4924,9 @@ document.getElementById('n-export-btn').onclick = async ()=>{
 };
 
 document.getElementById('n-export-csv-btn').onclick = async ()=>{
-  const month = await getNMonth();
+  const { month, roster, dayTypes, assignments } = await getNBundle_();
   if(!month){ alert('Configure o mês de referência antes de exportar.'); return; }
   const total = daysInMonth(month);
-  const roster = await getNRoster();
-  const dayTypes = await getNDayTypes();
-  const assignments = await getNAssignments();
   const rows = [['Dia', 'Tipo', 'Analista 1', 'Analista 2']];
   for(let day=1; day<=total; day++){
     const type = nDayType(dayTypes, month, day);
@@ -4967,14 +4959,14 @@ document.getElementById('n-export-csv-btn').onclick = async ()=>{
 /* ---------- NIIAD: aba Configurar (admin) ---------- */
 async function loadNAdminPanel(){
   wireSupervisorPasswordCard_('niiad');
-  const month = await getNMonth();
+  const bundle = await getNBundle_();
+  const { month, released, roster } = bundle;
   const monthInput = document.getElementById('n-month-input');
   monthInput.value = month ? month : getNextMonthISO();
 
-  const [released, roster] = await Promise.all([getNReleased(), getNRoster()]);
   updateNReleaseAdminUI(released);
 
-  await Promise.all([renderNDayTypesEditor(), renderNTurnAdmin()]);
+  await Promise.all([renderNDayTypesEditor(bundle), renderNTurnAdmin(bundle)]);
 
   const listEl = document.getElementById('n-roster-list');
   listEl.innerHTML = '';
@@ -4983,15 +4975,23 @@ async function loadNAdminPanel(){
   monthInput.onchange = renderNDayTypesEditor;
 }
 
-async function renderNDayTypesEditor(){
+// preloadedBundle (opcional): reaproveita o que loadNAdminPanel já buscou,
+// desde que o mês combine com o que está no campo (senão busca fresco —
+// ex.: quando o próprio campo de mês muda).
+async function renderNDayTypesEditor(preloadedBundle){
   const monthInput = document.getElementById('n-month-input');
   const monthVal = monthInput.value;
   const wrap = document.getElementById('n-daytypes-list');
   wrap.innerHTML = '';
   if(!monthVal) return;
   const total = daysInMonth(monthVal);
-  const savedMonth = await getNMonth();
-  const dayTypes = (savedMonth === monthVal) ? await getNDayTypes() : {};
+  let dayTypes;
+  if(preloadedBundle && preloadedBundle.month === monthVal){
+    dayTypes = preloadedBundle.dayTypes;
+  } else {
+    const savedMonth = await getNMonth();
+    dayTypes = (savedMonth === monthVal) ? await getNDayTypes() : {};
+  }
 
   for(let day=1; day<=total; day++){
     const type = dayTypes[String(day)] || nDefaultDayType(monthVal, day);
@@ -5061,10 +5061,9 @@ document.getElementById('n-toggle-release-btn').onclick = async ()=>{
   setTimeout(()=> statusEl.textContent='', 4000);
 };
 
-async function renderNTurnAdmin(){
-  const [roster, assignments, dayTypes, month, skipped] = await Promise.all([
-    getNRoster(), getNAssignments(), getNDayTypes(), getNMonth(), getNSkipped()
-  ]);
+async function renderNTurnAdmin(preloadedBundle){
+  const bundle = (preloadedBundle && ('month' in preloadedBundle)) ? preloadedBundle : await getNBundle_();
+  const { roster, assignments, dayTypes, month, skipped } = bundle;
   const turn = computeNTurn(roster, assignments, dayTypes, month, skipped);
   const el = document.getElementById('n-turn-admin-text');
   if(!turn){
@@ -5077,9 +5076,7 @@ async function renderNTurnAdmin(){
 document.getElementById('n-skip-turn-btn').onclick = async ()=>{
   const statusEl = document.getElementById('n-turn-admin-status');
   try{
-    const [roster, assignments, dayTypes, month, skipped] = await Promise.all([
-      getNRoster(), getNAssignments(), getNDayTypes(), getNMonth(), getNSkipped()
-    ]);
+    const { roster, assignments, dayTypes, month, skipped } = await getNBundle_();
     const turn = computeNTurn(roster, assignments, dayTypes, month, skipped);
     if(!turn){
       statusEl.style.color = '#f87171';
