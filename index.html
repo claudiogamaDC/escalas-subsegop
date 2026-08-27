@@ -139,6 +139,7 @@
   .n-cal-row .n-cal-day{font-size:13px;color:var(--text);font-weight:600;}
   .n-cal-row .n-cal-type{font-size:10px;font-weight:700;text-transform:uppercase;padding:2px 8px;border-radius:10px;}
   .n-cal-row .n-cal-type.preto{background:#111827;color:#e5e7eb;}
+  .n-cal-row .n-cal-type.sexta{background:#9333ea;color:white;}
   .n-cal-row .n-cal-type.vermelho{background:#b91c1c;color:white;}
   .n-cal-row .n-cal-type.indisponivel{background:#f59e0b;color:#1a1a1a;font-weight:800;}
   .n-cal-slots{display:flex;gap:8px;flex-wrap:wrap;}
@@ -150,6 +151,7 @@
   .n-slot .n-slot-name{font-size:12px;color:var(--muted);flex:1;}
 
   table.sched td.st-preto{background:#111827;color:#ffffff;font-weight:800;}
+  table.sched td.st-sexta{background:#e9d5ff;color:#000000;font-weight:800;}
   table.sched td.st-vermelho{background:#fecaca;color:#000000;font-weight:800;}
   table.sched td.st-indisponivel{background:#f59e0b;color:#1a1a1a;font-weight:800;}
   th.th-vermelho{background:#b91c1c;}
@@ -384,7 +386,7 @@
 
   <div class="roster-card">
     <label style="margin-top:0;">Efetivo (nome + posto/graduação)</label>
-    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">O <strong>posto/graduação</strong> define a ordem de antiguidade na lista e na Escala Compilada (Cel → Sd) e também define automaticamente se a pessoa entra como Oficial ou Praça. Dentro do mesmo posto, use as setas <strong>▲▼</strong> pra colocar quem é mais antigo em cima. Campo "Nova senha": deixe em branco para manter a senha atual da pessoa. Se ela ainda não tiver senha, precisa cadastrar uma aqui antes que ela consiga entrar. A mesma senha vale se a pessoa também estiver na lista do CEMADEN.<br><strong>Usuário simples</strong> só marca os próprios dias e só visualiza a Escala Compilada. <strong>Usuário responsável</strong> pode marcar por qualquer pessoa e exportar a Escala Compilada (PNG/CSV).<br><strong>Cota preta / Cota vermelha</strong>: usadas somente na aba de Serviço Mensal (mesmo efetivo desta lista) — definem quantos dias pretos e vermelhos (RAS) cada pessoa deve cumprir naquele mês.</p>
+    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">O <strong>posto/graduação</strong> define a ordem de antiguidade na lista e na Escala Compilada (Cel → Sd) e também define automaticamente se a pessoa entra como Oficial ou Praça. Dentro do mesmo posto, use as setas <strong>▲▼</strong> pra colocar quem é mais antigo em cima. Campo "Nova senha": deixe em branco para manter a senha atual da pessoa. Se ela ainda não tiver senha, precisa cadastrar uma aqui antes que ela consiga entrar. A mesma senha vale se a pessoa também estiver na lista do CEMADEN.<br><strong>Usuário simples</strong> só marca os próprios dias e só visualiza a Escala Compilada. <strong>Usuário responsável</strong> pode marcar por qualquer pessoa e exportar a Escala Compilada (PNG/CSV).<br><strong>Cota preta / Cota sexta / Cota vermelha</strong>: usadas somente na aba de Serviço Mensal (mesmo efetivo desta lista) — definem quantos dias pretos, sextas e vermelhos (sáb/dom, RAS) cada pessoa deve cumprir naquele mês (as três somadas dão o total de serviços dela).</p>
     <div id="roster-list"></div>
     <button class="add-row-btn" id="add-roster-btn">+ Adicionar pessoa</button>
     <button class="save-btn" id="save-roster-btn">Salvar efetivo</button>
@@ -445,7 +447,8 @@
     <div class="legend-box">
       <strong style="margin-right:4px;">Legenda:</strong>
       <span class="legend-item"><span class="legend-swatch" style="background:#111827"></span> Preto</span>
-      <span class="legend-item"><span class="legend-swatch" style="background:#b91c1c"></span> Vermelho (RAS)</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#e9d5ff"></span> Sexta (RAS)</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#b91c1c"></span> Vermelho — Sáb/Dom (RAS)</span>
       <span class="legend-item"><span class="legend-swatch" style="background:#f59e0b"></span> Não disponível</span>
       <span class="legend-item">🔄 Vaga trocada (permuta aprovada)</span>
     </div>
@@ -453,7 +456,7 @@
   </div>
 
   <div class="schedule-wrap" id="s-summary-wrap" style="margin-top:16px;">
-    <div class="schedule-title">DISTRIBUIÇÃO POR PESSOA (Preta + Vermelha = Total)</div>
+    <div class="schedule-title">DISTRIBUIÇÃO POR PESSOA (Preta + Sexta + Vermelha = Total)</div>
     <table class="sched" id="s-summary-table"></table>
   </div>
 </div>
@@ -469,12 +472,12 @@
     <div class="status" id="s-swap-propose-status"></div>
   </div>
 
-  <div class="schedule-wrap" id="s-swap-incoming-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
     <div id="s-swap-incoming-list" style="padding:12px;"></div>
   </div>
 
-  <div class="schedule-wrap" id="s-swap-mine-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="s-swap-mine-list" style="padding:12px;"></div>
   </div>
@@ -520,7 +523,7 @@
 
   <div class="roster-card">
     <label style="margin-top:0;">Tipo de cada dia do mês</label>
-    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Por padrão, Sex/Sáb/Dom = vermelho e os demais dias = preto. Clique num dia pra alternar o tipo — inclusive marcar como <strong>não disponível</strong> (sem serviço naquele dia).</p>
+    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Por padrão, Sex = sexta, Sáb/Dom = vermelho e os demais dias = preto — cada tipo tem sua própria cota (ver "Efetivo" abaixo). Clique num dia pra alternar o tipo — inclusive marcar como <strong>não disponível</strong> (sem serviço naquele dia).</p>
     <div id="s-daytypes-list" style="display:flex;gap:6px;flex-wrap:wrap;"></div>
     <button class="save-btn" id="s-save-daytypes-btn" style="margin-top:14px;">Salvar tipos de dia</button>
     <div class="status" id="s-daytypes-status"></div>
@@ -535,7 +538,7 @@
 
   <div class="roster-card">
     <label style="margin-top:0;">Efetivo</label>
-    <p style="font-size:11px;color:var(--muted);margin:0;">O Serviço Mensal usa o <strong>mesmo efetivo</strong> cadastrado na aba <strong>Configurar SUBSEGOP</strong> (mesmos nomes, postos e senhas). As cotas de dias pretos e vermelhos (RAS) para o Serviço Mensal também são definidas lá, em campos próprios ao lado de cada pessoa.</p>
+    <p style="font-size:11px;color:var(--muted);margin:0;">O Serviço Mensal usa o <strong>mesmo efetivo</strong> cadastrado na aba <strong>Configurar SUBSEGOP</strong> (mesmos nomes, postos e senhas). As cotas de dias pretos, sextas e vermelhos (RAS) para o Serviço Mensal também são definidas lá, em campos próprios ao lado de cada pessoa.</p>
   </div>
 </div>
 
@@ -616,12 +619,12 @@
     <div class="status" id="c-swap-propose-status"></div>
   </div>
 
-  <div class="schedule-wrap" id="c-swap-incoming-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
     <div id="c-swap-incoming-list" style="padding:12px;"></div>
   </div>
 
-  <div class="schedule-wrap" id="c-swap-mine-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="c-swap-mine-list" style="padding:12px;"></div>
   </div>
@@ -775,12 +778,12 @@
     <div class="status" id="n-swap-propose-status"></div>
   </div>
 
-  <div class="schedule-wrap" id="n-swap-incoming-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
     <div id="n-swap-incoming-list" style="padding:12px;"></div>
   </div>
 
-  <div class="schedule-wrap" id="n-swap-mine-wrap" style="margin-top:16px;">
+  <div class="schedule-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="n-swap-mine-list" style="padding:12px;"></div>
   </div>
@@ -1363,11 +1366,25 @@ document.getElementById('show-user-login-from-supervisor').onclick = (e)=>{ e.pr
 
 function sleep_(ms){ return new Promise(r=> setTimeout(r, ms)); }
 
+function showDebugBanner_(msg){
+  try{
+    let el = document.getElementById('debug-banner');
+    if(!el){
+      el = document.createElement('div');
+      el.id = 'debug-banner';
+      el.style.cssText = 'position:fixed;bottom:0;left:0;right:0;z-index:99999;background:#1e3a5f;color:#fff;padding:8px 12px;font:11px monospace;white-space:pre-wrap;max-height:30vh;overflow:auto;';
+      (document.body || document.documentElement).appendChild(el);
+    }
+    el.textContent += (el.textContent ? '\n' : '') + msg;
+  }catch(e){ /* nada a fazer */ }
+}
+
 async function populateLoginNameSelect(attempt){
   attempt = attempt || 1;
+  showDebugBanner_('populateLoginNameSelect chamada (tentativa ' + attempt + ')');
   const select = document.getElementById('login-name-select');
   const setorSelect = document.getElementById('login-setor-select');
-  if(!select){ return; }
+  if(!select){ showDebugBanner_('ERRO: elemento login-name-select não encontrado no DOM'); return; }
   const setor = setorSelect ? setorSelect.value : 'subsegop';
   select.innerHTML = '<option value="">Carregando...</option>';
   try{
@@ -1379,8 +1396,10 @@ async function populateLoginNameSelect(attempt){
     const sorted = sortByRank_(people.filter(p=> p && p.name));
     select.innerHTML = '<option value="">-- selecione --</option>' +
       sorted.map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
+    showDebugBanner_('Nomes carregados: ' + sorted.length + ' (setor: ' + setor + '). select.options.length agora = ' + select.options.length);
   }catch(e){
     console.error('Erro ao carregar nomes (tentativa ' + attempt + '):', e);
+    showDebugBanner_('ERRO ao carregar nomes (tentativa ' + attempt + '): ' + (e && e.message ? e.message : String(e)));
     if(attempt < 3){
       // Primeira chamada ao Apps Script após abrir a página pode falhar
       // (cold start) — tenta de novo automaticamente antes de desistir.
@@ -1391,20 +1410,6 @@ async function populateLoginNameSelect(attempt){
   }
 }
 document.getElementById('login-setor-select').addEventListener('change', populateLoginNameSelect);
-// Busca a lista de nomes de novo sempre que alguém entrar no campo — evita
-// mostrar uma lista desatualizada se o admin mudou o efetivo enquanto a tela
-// de login já estava aberta (antes só recarregava ao trocar o Setor ou dar
-// F5). Não trava a abertura do campo — só atualiza os dados em segundo
-// plano, prontos pra próxima vez que a pessoa clicar/abrir a lista.
-document.getElementById('login-name-select').addEventListener('focus', ()=>{
-  const select = document.getElementById('login-name-select');
-  const current = select.value;
-  populateLoginNameSelect().then(()=>{
-    if(current && Array.from(select.options).some(o=> o.value === current)){
-      select.value = current;
-    }
-  });
-});
 
 function logout(){
   clearSession();
@@ -1741,7 +1746,9 @@ document.querySelectorAll('.tab').forEach(tab=>{
 
 // Retoma sessão salva (deve rodar DEPOIS dos listeners de aba acima, senão o clique automático não tem efeito)
 (function resumeSession(){
+  showDebugBanner_('resumeSession rodou');
   const saved = loadSession();
+  showDebugBanner_('loadSession retornou: ' + (saved ? JSON.stringify(saved).slice(0,150) : 'null/vazio'));
   if(saved && saved.role){
     currentRole = saved.role;
     currentGroups = saved.groups || [];
@@ -2261,7 +2268,7 @@ async function loadRosterPanel(){
 
   const listEl = document.getElementById('roster-list');
   listEl.innerHTML = '';
-  sortByRank_(roster).forEach(p=> addRosterRow(p.name, p.level, p.rank, p.quotaPreto, p.quotaVermelho));
+  sortByRank_(roster).forEach(p=> addRosterRow(p.name, p.level, p.rank, p.quotaPreto, p.quotaVermelho, p.quotaSexta));
 }
 
 function renderActiveDaysCheckboxes(activeDays){
@@ -2322,7 +2329,7 @@ function moveRow_(row){
   };
 }
 
-function addRosterRow(name="", level="simples", rank="", quotaPreto=0, quotaVermelho=0){
+function addRosterRow(name="", level="simples", rank="", quotaPreto=0, quotaVermelho=0, quotaSexta=0){
   const listEl = document.getElementById('roster-list');
   const row = document.createElement('div');
   row.className = 'roster-row';
@@ -2342,7 +2349,8 @@ function addRosterRow(name="", level="simples", rank="", quotaPreto=0, quotaVerm
     </select>
     <input type="text" placeholder="Nova senha" class="roster-password-input" style="flex:0 0 130px;" autocomplete="off">
     <input type="number" min="0" value="${quotaPreto||0}" placeholder="Cota preta" class="roster-quota-preto-input" style="flex:0 0 90px;" title="Cota de dias pretos no Serviço Mensal">
-    <input type="number" min="0" value="${quotaVermelho||0}" placeholder="Cota vermelha" class="roster-quota-vermelho-input" style="flex:0 0 100px;" title="Cota de dias vermelhos (RAS) no Serviço Mensal">
+    <input type="number" min="0" value="${quotaSexta||0}" placeholder="Cota sexta" class="roster-quota-sexta-input" style="flex:0 0 90px;" title="Cota de dias de sexta-feira (RAS) no Serviço Mensal">
+    <input type="number" min="0" value="${quotaVermelho||0}" placeholder="Cota vermelha" class="roster-quota-vermelho-input" style="flex:0 0 100px;" title="Cota de dias vermelhos — sábado/domingo (RAS) no Serviço Mensal">
     <button class="roster-remove-btn">Remover</button>`;
   row.querySelector('.roster-remove-btn').onclick = ()=> row.remove();
   row.querySelector('.row-move-up').onclick = ()=> moveRow_(row).up();
@@ -2378,9 +2386,10 @@ document.getElementById('save-roster-btn').onclick = async ()=>{
     const level = r.querySelector('.roster-level-select').value;
     const newPassword = r.querySelector('.roster-password-input').value.trim();
     const quotaPreto = Number(r.querySelector('.roster-quota-preto-input').value) || 0;
+    const quotaSexta = Number(r.querySelector('.roster-quota-sexta-input').value) || 0;
     const quotaVermelho = Number(r.querySelector('.roster-quota-vermelho-input').value) || 0;
     if(name){
-      roster.push({name, cat, level, rank, quotaPreto, quotaVermelho});
+      roster.push({name, cat, level, rank, quotaPreto, quotaSexta, quotaVermelho});
       if(newPassword) pendingPasswords.push({name, newPassword});
     }
   });
@@ -2492,13 +2501,23 @@ async function getSObs(){
   catch(e){ return ""; }
 }
 
+// Sexta tem cota própria (como o Ordinário no NIIAD) — só Sáb/Dom contam
+// como vermelho. Preto, Sexta e Vermelho são cotas independentes que, somadas,
+// dão o total de dias de serviço da pessoa no mês.
 function sDefaultDayType(month, day){
   const [y,m] = month.split('-').map(Number);
   const dow = new Date(y, m-1, day).getDay(); // 0=Dom .. 6=Sáb
-  return (dow === 0 || dow === 5 || dow === 6) ? 'vermelho' : 'preto'; // Sex/Sáb/Dom
+  if(dow === 5) return 'sexta';
+  return (dow === 0 || dow === 6) ? 'vermelho' : 'preto';
 }
 function sDayType(dayTypes, month, day){
   return dayTypes[String(day)] || sDefaultDayType(month, day);
+}
+function sQuotaFor_(entry, type){
+  if(!entry) return 0;
+  if(type === 'preto') return Number(entry.quotaPreto)||0;
+  if(type === 'sexta') return Number(entry.quotaSexta)||0;
+  return Number(entry.quotaVermelho)||0;
 }
 
 function sSlotNames_(slots){ return (slots||[]).filter(Boolean); }
@@ -2506,7 +2525,7 @@ function sSlotNames_(slots){ return (slots||[]).filter(Boolean); }
 function computeSTurn(roster, assignments, dayTypes, month, skipped){
   const order = sortByRank_(roster);
   const counts = {};
-  order.forEach(p=> counts[p.name] = {preto:0, vermelho:0});
+  order.forEach(p=> counts[p.name] = {preto:0, sexta:0, vermelho:0});
   Object.keys(assignments).forEach(day=>{
     const type = sDayType(dayTypes, month, Number(day));
     if(type === 'indisponivel') return;
@@ -2516,25 +2535,29 @@ function computeSTurn(roster, assignments, dayTypes, month, skipped){
   });
   for(const p of order){
     if(skipped.includes(p.name)) continue;
-    const c = counts[p.name] || {preto:0, vermelho:0};
-    const qp = Number(p.quotaPreto)||0, qv = Number(p.quotaVermelho)||0;
-    if(c.preto < qp || c.vermelho < qv){
-      return { name: p.name, counts: c, quotaPreto: qp, quotaVermelho: qv };
+    const c = counts[p.name] || {preto:0, sexta:0, vermelho:0};
+    const qp = Number(p.quotaPreto)||0, qs = Number(p.quotaSexta)||0, qv = Number(p.quotaVermelho)||0;
+    if(c.preto < qp || c.sexta < qs || c.vermelho < qv){
+      return { name: p.name, counts: c, quotaPreto: qp, quotaSexta: qs, quotaVermelho: qv };
     }
   }
   return null;
 }
 
 function sCountsFor_(name, assignments, dayTypes, month){
-  let preto = 0, vermelho = 0;
+  let preto = 0, sexta = 0, vermelho = 0;
   Object.keys(assignments).forEach(day=>{
     const type = sDayType(dayTypes, month, Number(day));
     if(type === 'indisponivel') return;
     (assignments[day]||[]).forEach(n=>{
-      if(n === name){ if(type === 'preto') preto++; else vermelho++; }
+      if(n === name){
+        if(type === 'preto') preto++;
+        else if(type === 'sexta') sexta++;
+        else vermelho++;
+      }
     });
   });
-  return { preto, vermelho };
+  return { preto, sexta, vermelho };
 }
 
 /* ---------- SUBSEGOP Serviço Mensal: Trocas de plantão (item 1) ---------- */
@@ -2589,11 +2612,6 @@ async function loadSSwapsPanel(){
       await loadSSwapsPanel();
     };
   }
-
-  // Supervisão não tem identidade pessoal — "pedidos pra mim" e "minhas
-  // propostas" não fazem sentido nesse papel, então ficam escondidos.
-  document.getElementById('s-swap-incoming-wrap').style.display = isSupervisor ? 'none' : '';
-  document.getElementById('s-swap-mine-wrap').style.display = isSupervisor ? 'none' : '';
 
   const incomingEl = document.getElementById('s-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
@@ -2788,7 +2806,7 @@ async function renderSCalendarList(){
     turnTextEl.textContent = 'Ninguém tem vez no momento — todas as cotas foram completadas.';
   } else {
     const turnPerson = roster.find(p=> p.name === turn.name) || {name: turn.name};
-    turnTextEl.textContent = displayName_(turnPerson) + ' — ' + turn.counts.preto + '/' + turn.quotaPreto + ' preto(s), ' + turn.counts.vermelho + '/' + turn.quotaVermelho + ' vermelho(s)';
+    turnTextEl.textContent = displayName_(turnPerson) + ' — ' + turn.counts.preto + '/' + turn.quotaPreto + ' preto(s), ' + turn.counts.sexta + '/' + turn.quotaSexta + ' sexta(s), ' + turn.counts.vermelho + '/' + turn.quotaVermelho + ' vermelho(s)';
   }
 
   const myEntry = roster.find(p=> p.name === myName);
@@ -2796,8 +2814,9 @@ async function renderSCalendarList(){
   if(myEntry){
     const c = sCountsFor_(myName, assignments, dayTypes, month);
     const qPreto = Number(myEntry.quotaPreto)||0;
+    const qSexta = Number(myEntry.quotaSexta)||0;
     const qVermelho = Number(myEntry.quotaVermelho)||0;
-    myQuotaEl.textContent = c.preto + '/' + qPreto + ' preto(s) + ' + c.vermelho + '/' + qVermelho + ' vermelho(s) = ' + (qPreto + qVermelho) + ' no total';
+    myQuotaEl.textContent = c.preto + '/' + qPreto + ' preto(s) + ' + c.sexta + '/' + qSexta + ' sexta(s) + ' + c.vermelho + '/' + qVermelho + ' vermelho(s) = ' + (qPreto + qSexta + qVermelho) + ' no total';
   } else {
     myQuotaEl.textContent = isAdmin ? '' : 'Você ainda não está cadastrado no efetivo do serviço mensal.';
   }
@@ -2816,8 +2835,7 @@ async function renderSCalendarList(){
     const entry = roster.find(p=> p.name === name);
     if(entry){
       const c = sCountsFor_(name, assignments, dayTypes, month);
-      const quota = type === 'preto' ? (Number(entry.quotaPreto)||0) : (Number(entry.quotaVermelho)||0);
-      if((type === 'preto' ? c.preto : c.vermelho) >= quota) return false;
+      if((c[type]||0) >= sQuotaFor_(entry, type)) return false;
     }
     return true;
   }
@@ -2837,7 +2855,9 @@ async function renderSCalendarList(){
       continue;
     }
 
-    const slotVermelhoCls = type === 'vermelho' ? ' vermelho' : '';
+    // Sexta usa o mesmo visual "vermelho" do slot (continua sendo RAS) — só o
+    // selo do tipo do dia (acima) distingue sexta de sábado/domingo.
+    const slotVermelhoCls = (type === 'vermelho' || type === 'sexta') ? ' vermelho' : '';
     const slotHtml = (slotIdx)=>{
       const occupantName = slots[slotIdx] || null;
       if(occupantName){
@@ -2930,8 +2950,7 @@ async function validateSPick_(targetName, day, ctx){
   const entry = roster.find(p=> p.name === targetName);
   if(entry){
     const c = sCountsFor_(targetName, assignments, dayTypes, month);
-    const quota = type === 'preto' ? (Number(entry.quotaPreto)||0) : (Number(entry.quotaVermelho)||0);
-    if((type === 'preto' ? c.preto : c.vermelho) >= quota){
+    if((c[type]||0) >= sQuotaFor_(entry, type)){
       return {ok:false, error:'Essa pessoa já completou a cota de dias ' + type + '.'};
     }
   }
@@ -2985,12 +3004,14 @@ function sSummaryRows_(roster, assignments, dayTypes, month){
   return roster.map(p=>{
     const c = sCountsFor_(p.name, assignments, dayTypes, month);
     const quotaPreto = Number(p.quotaPreto)||0;
+    const quotaSexta = Number(p.quotaSexta)||0;
     const quotaVermelho = Number(p.quotaVermelho)||0;
     return {
       name: displayName_(p),
       preta: c.preto + '/' + quotaPreto,
+      sexta: c.sexta + '/' + quotaSexta,
       vermelha: c.vermelho + '/' + quotaVermelho,
-      total: quotaPreto + quotaVermelho
+      total: quotaPreto + quotaSexta + quotaVermelho
     };
   });
 }
@@ -2998,9 +3019,9 @@ function sSummaryRows_(roster, assignments, dayTypes, month){
 function renderSSummaryTable_(roster, assignments, dayTypes, month){
   const table = document.getElementById('s-summary-table');
   const rows = sSummaryRows_(roster, assignments, dayTypes, month);
-  let html = '<thead><tr><th class="nome-h">Nome</th><th>Preta (feito/cota)</th><th>Vermelha (feito/cota)</th><th>Total</th></tr></thead><tbody>';
+  let html = '<thead><tr><th class="nome-h">Nome</th><th>Preta (feito/cota)</th><th>Sexta (feito/cota)</th><th>Vermelha (feito/cota)</th><th>Total</th></tr></thead><tbody>';
   rows.forEach(r=>{
-    html += `<tr><td class="nome-c">${r.name}</td><td>${r.preta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
+    html += `<tr><td class="nome-c">${r.name}</td><td>${r.preta}</td><td>${r.sexta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
   });
   html += '</tbody>';
   table.innerHTML = html;
@@ -3033,9 +3054,9 @@ document.getElementById('s-export-csv-btn').onclick = async ()=>{
 
   rows.push([]);
   rows.push(['Distribuição por pessoa']);
-  rows.push(['Nome', 'Preta (feito/cota)', 'Vermelha (feito/cota)', 'Total']);
+  rows.push(['Nome', 'Preta (feito/cota)', 'Sexta (feito/cota)', 'Vermelha (feito/cota)', 'Total']);
   sSummaryRows_(sortByRank_(roster), assignments, dayTypes, month).forEach(r=>{
-    rows.push([r.name, r.preta, r.vermelha, r.total]);
+    rows.push([r.name, r.preta, r.sexta, r.vermelha, r.total]);
   });
 
   try{
@@ -3067,8 +3088,8 @@ async function renderSDayTypesEditor(){
   const savedMonth = await getSMonth();
   const dayTypes = (savedMonth === monthVal) ? await getSDayTypes() : {};
 
-  const CYCLE = ['preto', 'vermelho', 'indisponivel'];
-  const COLORS = { preto:'#111827', vermelho:'#b91c1c', indisponivel:'#f59e0b' };
+  const CYCLE = ['preto', 'sexta', 'vermelho', 'indisponivel'];
+  const COLORS = { preto:'#111827', sexta:'#9333ea', vermelho:'#b91c1c', indisponivel:'#f59e0b' };
 
   for(let day=1; day<=total; day++){
     const type = dayTypes[String(day)] || sDefaultDayType(monthVal, day);
@@ -3152,7 +3173,7 @@ async function renderSTurnAdmin(){
     return;
   }
   const turnPerson = roster.find(p=> p.name === turn.name) || {name: turn.name};
-  el.textContent = displayName_(turnPerson) + ' — ' + turn.counts.preto + '/' + turn.quotaPreto + ' preto(s), ' + turn.counts.vermelho + '/' + turn.quotaVermelho + ' vermelho(s)';
+  el.textContent = displayName_(turnPerson) + ' — ' + turn.counts.preto + '/' + turn.quotaPreto + ' preto(s), ' + turn.counts.sexta + '/' + turn.quotaSexta + ' sexta(s), ' + turn.counts.vermelho + '/' + turn.quotaVermelho + ' vermelho(s)';
 }
 document.getElementById('s-skip-turn-btn').onclick = async ()=>{
   const statusEl = document.getElementById('s-turn-admin-status');
@@ -3397,9 +3418,6 @@ async function loadCSwapsPanel(){
       await loadCSwapsPanel();
     };
   }
-
-  document.getElementById('c-swap-incoming-wrap').style.display = isSupervisor ? 'none' : '';
-  document.getElementById('c-swap-mine-wrap').style.display = isSupervisor ? 'none' : '';
 
   const incomingEl = document.getElementById('c-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
@@ -4236,9 +4254,6 @@ async function loadNSwapsPanel(){
       await loadNSwapsPanel();
     };
   }
-
-  document.getElementById('n-swap-incoming-wrap').style.display = isSupervisor ? 'none' : '';
-  document.getElementById('n-swap-mine-wrap').style.display = isSupervisor ? 'none' : '';
 
   const incomingEl = document.getElementById('n-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
