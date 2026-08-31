@@ -218,7 +218,15 @@
     </div>
     <div id="login-admin-form" style="display:none;">
       <h2>Acesso do administrador</h2>
-      <p>Digite a senha de administrador</p>
+      <p>Selecione o setor (ou Master) e digite a senha</p>
+      <label style="margin-top:0;">Setor</label>
+      <select id="admin-setor-select">
+        <option value="master">Master — acesso total</option>
+        <option value="subsegop">SUBSEGOP</option>
+        <option value="cemaden">Of. Lig. CEMADEN</option>
+        <option value="niiad">NIIAD</option>
+      </select>
+      <label>Senha</label>
       <input type="password" id="admin-password-input" placeholder="••••••••">
       <button id="admin-login-btn">Entrar</button>
       <div id="admin-login-error"></div>
@@ -260,8 +268,8 @@
       <div class="tab" data-panel="fill-subsegop-serv" data-group="subsegop">Meus serviços</div>
       <div class="tab" data-panel="compiled-subsegop-serv" data-group="subsegop">Escala Serviço Mensal</div>
       <div class="tab" data-panel="swaps-subsegop-serv" data-group="subsegop">Trocas de plantão</div>
-      <div class="tab" data-panel="admin-subsegop" data-admin-only="true">Configurar SUBSEGOP</div>
-      <div class="tab" data-panel="admin-subsegop-serv" data-admin-only="true">Configurar Serviço Mensal</div>
+      <div class="tab" data-panel="admin-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Configurar SUBSEGOP</div>
+      <div class="tab" data-panel="admin-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar Serviço Mensal</div>
     </div>
   </div>
 
@@ -271,7 +279,7 @@
       <div class="tab" data-panel="fill-cemaden" data-group="cemaden">Registrar Serviço</div>
       <div class="tab" data-panel="compiled-cemaden" data-group="cemaden">Escala Compilada</div>
       <div class="tab" data-panel="swaps-cemaden" data-group="cemaden">Trocas de plantão</div>
-      <div class="tab" data-panel="admin-cemaden" data-admin-only="true">Configurar CEMADEN</div>
+      <div class="tab" data-panel="admin-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Configurar CEMADEN</div>
     </div>
   </div>
 
@@ -281,14 +289,14 @@
       <div class="tab" data-panel="fill-niiad" data-group="niiad">Escolher meus dias</div>
       <div class="tab" data-panel="compiled-niiad" data-group="niiad">Escala Compilada</div>
       <div class="tab" data-panel="swaps-niiad" data-group="niiad">Trocas de plantão</div>
-      <div class="tab" data-panel="admin-niiad" data-admin-only="true">Configurar NIIAD</div>
+      <div class="tab" data-panel="admin-niiad" data-admin-only="true" data-admin-only-setor="niiad">Configurar NIIAD</div>
     </div>
   </div>
 
   <div class="tab-group">
     <div class="tab-group-label">ADMINISTRAÇÃO</div>
     <div class="tab-group-row">
-      <div class="tab" data-panel="log-uso" data-admin-only="true">Histórico de Uso</div>
+      <div class="tab" data-panel="log-uso" data-admin-only="true" data-master-only="true">Histórico de Uso</div>
     </div>
   </div>
 </div>
@@ -360,6 +368,29 @@
     <input type="password" id="sup-password-subsegop" placeholder="Nova senha de supervisão" style="margin-top:8px;max-width:280px;">
     <button class="save-btn" id="sup-save-subsegop" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar senha de supervisão</button>
     <div class="status" id="sup-status-msg-subsegop"></div>
+  </div>
+  <div class="roster-card">
+    <label style="margin-top:0;">Aviso por e-mail quando uma troca de plantão for aprovada</label>
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão</label>
+    <input type="email" id="notify-sup-email-subsegop" placeholder="supervisao@exemplo.gov.br" style="max-width:320px;">
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail extra (opcional)</label>
+    <input type="email" id="notify-extra-email-subsegop" placeholder="outro@exemplo.gov.br" style="max-width:320px;">
+    <button class="save-btn" id="notify-save-subsegop" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar e-mails de aviso</button>
+    <div class="status" id="notify-status-msg-subsegop"></div>
+  </div>
+  <div class="roster-card" id="admin-pw-card-subsegop">
+    <label style="margin-top:0;">Acesso de administrador deste setor</label>
+    <div id="admin-pw-master-block-subsegop" style="display:none;">
+      <input type="password" id="admin-pw-master-input-subsegop" placeholder="Redefinir senha do admin de SUBSEGOP" style="max-width:280px;">
+      <button class="save-btn" id="admin-pw-master-save-subsegop" style="margin-top:8px;width:auto;padding:8px 16px;">Redefinir senha</button>
+      <div class="status" id="admin-pw-master-msg-subsegop"></div>
+    </div>
+    <div id="admin-pw-self-block-subsegop" style="display:none;">
+      <input type="password" id="admin-pw-self-old-subsegop" placeholder="Senha atual" style="max-width:280px;">
+      <input type="password" id="admin-pw-self-new-subsegop" placeholder="Nova senha" style="margin-top:8px;max-width:280px;">
+      <button class="save-btn" id="admin-pw-self-save-subsegop" style="margin-top:8px;width:auto;padding:8px 16px;">Trocar minha senha de admin</button>
+      <div class="status" id="admin-pw-self-msg-subsegop"></div>
+    </div>
   </div>
   <div class="roster-card">
     <label style="margin-top:0;">Liberação para preenchimento</label>
@@ -663,6 +694,29 @@
     <div class="status" id="sup-status-msg-cemaden"></div>
   </div>
   <div class="roster-card">
+    <label style="margin-top:0;">Aviso por e-mail quando uma troca de plantão for aprovada</label>
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão</label>
+    <input type="email" id="notify-sup-email-cemaden" placeholder="supervisao@exemplo.gov.br" style="max-width:320px;">
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail extra (opcional)</label>
+    <input type="email" id="notify-extra-email-cemaden" placeholder="outro@exemplo.gov.br" style="max-width:320px;">
+    <button class="save-btn" id="notify-save-cemaden" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar e-mails de aviso</button>
+    <div class="status" id="notify-status-msg-cemaden"></div>
+  </div>
+  <div class="roster-card" id="admin-pw-card-cemaden">
+    <label style="margin-top:0;">Acesso de administrador deste setor</label>
+    <div id="admin-pw-master-block-cemaden" style="display:none;">
+      <input type="password" id="admin-pw-master-input-cemaden" placeholder="Redefinir senha do admin de CEMADEN" style="max-width:280px;">
+      <button class="save-btn" id="admin-pw-master-save-cemaden" style="margin-top:8px;width:auto;padding:8px 16px;">Redefinir senha</button>
+      <div class="status" id="admin-pw-master-msg-cemaden"></div>
+    </div>
+    <div id="admin-pw-self-block-cemaden" style="display:none;">
+      <input type="password" id="admin-pw-self-old-cemaden" placeholder="Senha atual" style="max-width:280px;">
+      <input type="password" id="admin-pw-self-new-cemaden" placeholder="Nova senha" style="margin-top:8px;max-width:280px;">
+      <button class="save-btn" id="admin-pw-self-save-cemaden" style="margin-top:8px;width:auto;padding:8px 16px;">Trocar minha senha de admin</button>
+      <div class="status" id="admin-pw-self-msg-cemaden"></div>
+    </div>
+  </div>
+  <div class="roster-card">
     <label style="margin-top:0;">Liberação para preenchimento</label>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <span id="c-release-status-text" style="font-size:14px;font-weight:600;">Carregando...</span>
@@ -820,6 +874,29 @@
     <input type="password" id="sup-password-niiad" placeholder="Nova senha de supervisão" style="margin-top:8px;max-width:280px;">
     <button class="save-btn" id="sup-save-niiad" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar senha de supervisão</button>
     <div class="status" id="sup-status-msg-niiad"></div>
+  </div>
+  <div class="roster-card">
+    <label style="margin-top:0;">Aviso por e-mail quando uma troca de plantão for aprovada</label>
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão</label>
+    <input type="email" id="notify-sup-email-niiad" placeholder="supervisao@exemplo.gov.br" style="max-width:320px;">
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail extra (opcional)</label>
+    <input type="email" id="notify-extra-email-niiad" placeholder="outro@exemplo.gov.br" style="max-width:320px;">
+    <button class="save-btn" id="notify-save-niiad" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar e-mails de aviso</button>
+    <div class="status" id="notify-status-msg-niiad"></div>
+  </div>
+  <div class="roster-card" id="admin-pw-card-niiad">
+    <label style="margin-top:0;">Acesso de administrador deste setor</label>
+    <div id="admin-pw-master-block-niiad" style="display:none;">
+      <input type="password" id="admin-pw-master-input-niiad" placeholder="Redefinir senha do admin de NIIAD" style="max-width:280px;">
+      <button class="save-btn" id="admin-pw-master-save-niiad" style="margin-top:8px;width:auto;padding:8px 16px;">Redefinir senha</button>
+      <div class="status" id="admin-pw-master-msg-niiad"></div>
+    </div>
+    <div id="admin-pw-self-block-niiad" style="display:none;">
+      <input type="password" id="admin-pw-self-old-niiad" placeholder="Senha atual" style="max-width:280px;">
+      <input type="password" id="admin-pw-self-new-niiad" placeholder="Nova senha" style="margin-top:8px;max-width:280px;">
+      <button class="save-btn" id="admin-pw-self-save-niiad" style="margin-top:8px;width:auto;padding:8px 16px;">Trocar minha senha de admin</button>
+      <div class="status" id="admin-pw-self-msg-niiad"></div>
+    </div>
   </div>
   <div class="roster-card">
     <label style="margin-top:0;">Liberação para preenchimento</label>
@@ -1053,6 +1130,56 @@ async function backendGetSupervisorPasswordStatus(adminPassword){
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
+}
+async function backendSetSectorAdminPassword(setor, newPassword, adminPassword){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"set_sector_admin_password", secret: BACKEND_SECRET, setor, newPassword, adminPassword })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
+}
+async function backendChangeSectorAdminPassword(setor, oldPassword, newPassword){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"change_sector_admin_password", secret: BACKEND_SECRET, setor, oldPassword, newPassword })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
+}
+async function backendSetSectorNotifyEmails(setor, supervisorEmail, extraEmail, adminPassword){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"set_sector_notify_emails", secret: BACKEND_SECRET, setor, supervisorEmail, extraEmail, adminPassword })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
+}
+async function backendGetSectorNotifyEmails(setor, adminPassword){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"get_sector_notify_emails", secret: BACKEND_SECRET, setor, adminPassword })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
+}
+async function backendNotifySwapApproved(setor, groupLabel, month, day, fromName, toName){
+  // Best effort: se falhar, não deve travar a troca (que já foi aprovada e gravada antes desta chamada).
+  try{
+    const res = await fetch(BACKEND_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action:"notify_swap_approved", secret: BACKEND_SECRET, setor, groupLabel, month, day, fromName, toName })
+    });
+    return await res.json();
+  }catch(e){
+    console.error('Erro ao avisar troca aprovada por e-mail:', e);
+    return { ok:false, error:String(e) };
+  }
 }
 async function backendChangePassword(name, oldPassword, newPassword){
   const res = await fetch(BACKEND_URL, {
@@ -1317,11 +1444,13 @@ let currentGroups = [];        // ['subsegop'], ['cemaden'] ou os dois
 let currentLevels = {};        // { subsegop: 'simples'|'responsavel', cemaden: 'simples'|'responsavel' }
 let currentUserName = null;    // nome de quem logou (papel 'user')
 let currentAdminPassword = null; // guardada só em memória/sessão, só quando role === 'admin'
+let currentAdminSetor = null;    // null = admin Master (acesso total); 'subsegop'|'cemaden'|'niiad' = admin só daquele setor
 
 function saveSession(){
   try{
     sessionStorage.setItem('escalas_session', JSON.stringify({
-      role: currentRole, groups: currentGroups, levels: currentLevels, name: currentUserName, adminPassword: currentAdminPassword
+      role: currentRole, groups: currentGroups, levels: currentLevels, name: currentUserName,
+      adminPassword: currentAdminPassword, adminSetor: currentAdminSetor
     }));
   }catch(e){}
 }
@@ -1341,6 +1470,7 @@ function enterApp(session){
   currentLevels = session.levels || {};
   currentUserName = session.name || null;
   currentAdminPassword = session.adminPassword || null;
+  currentAdminSetor = session.adminSetor || null;
   document.getElementById('lock-screen').style.display = 'none';
   document.getElementById('app-content').style.display = 'block';
   saveSession();
@@ -1349,11 +1479,15 @@ function enterApp(session){
 
 function applyRoleVisibility(){
   const isAdmin = currentRole === 'admin';
+  const isMasterAdmin = isAdmin && !currentAdminSetor;
+  const isSectorAdmin = isAdmin && !!currentAdminSetor;
   const isSupervisor = currentRole === 'supervisor';
   const groupLabels = { subsegop:'SUBSEGOP', cemaden:'Of. Lig. CEMADEN', niiad:'NIIAD' };
   const levelLabels = { simples:'simples', responsavel:'responsável' };
-  document.getElementById('role-badge').textContent = isAdmin
-    ? 'Administrador — acesso total'
+  document.getElementById('role-badge').textContent = isMasterAdmin
+    ? 'Administrador Master — acesso total'
+    : isSectorAdmin
+    ? 'Administrador — ' + (groupLabels[currentAdminSetor] || currentAdminSetor) + ' (só este setor)'
     : isSupervisor
     ? 'Supervisão — ' + (groupLabels[currentGroups[0]] || currentGroups[0]) + ' (somente consulta)'
     : (currentUserName || '') + ' — ' + currentGroups.map(g=>
@@ -1365,10 +1499,19 @@ function applyRoleVisibility(){
   let firstVisible = null;
   document.querySelectorAll('.tab').forEach(tab=>{
     const adminOnly = tab.dataset.adminOnly === 'true';
+    const adminOnlySetor = tab.dataset.adminOnlySetor || null;
+    const masterOnly = tab.dataset.masterOnly === 'true';
     const group = tab.dataset.group;
     let visible;
-    if(isAdmin){
+    if(isMasterAdmin){
       visible = true;
+    } else if(isSectorAdmin){
+      // Admin de setor: acesso completo (preenchimento, compilada, trocas,
+      // "Configurar") mas só dentro do próprio setor — nunca Histórico
+      // (masterOnly) nem as abas dos outros setores.
+      if(masterOnly) visible = false;
+      else if(adminOnly) visible = adminOnlySetor === currentAdminSetor;
+      else visible = group === currentAdminSetor;
     } else if(isSupervisor){
       // Supervisão só consulta: escalas compiladas e trocas do próprio setor,
       // nunca telas de preenchimento nem "Configurar".
@@ -1456,7 +1599,7 @@ document.getElementById('login-name-select').addEventListener('focus', ()=>{
 
 function logout(){
   clearSession();
-  currentRole = null; currentGroups = []; currentLevels = {}; currentUserName = null; currentAdminPassword = null;
+  currentRole = null; currentGroups = []; currentLevels = {}; currentUserName = null; currentAdminPassword = null; currentAdminSetor = null;
   document.getElementById('app-content').style.display = 'none';
   document.getElementById('lock-screen').style.display = 'flex';
   document.getElementById('login-password-input').value = '';
@@ -1714,6 +1857,7 @@ document.getElementById('login-password-input').addEventListener('keydown', e=>{
 });
 
 async function doAdminLogin(){
+  const setorChoice = document.getElementById('admin-setor-select').value; // 'master'|'subsegop'|'cemaden'|'niiad'
   const password = document.getElementById('admin-password-input').value;
   const err = document.getElementById('admin-login-error');
   err.textContent = '';
@@ -1721,10 +1865,15 @@ async function doAdminLogin(){
   const btn = document.getElementById('admin-login-btn');
   btn.disabled = true;
   try{
-    const res = await backendLogin({ kind:'admin', password });
+    const res = await backendLogin({ kind:'admin', setor: setorChoice, password });
     if(res.ok){
-      enterApp({ role:'admin', groups:['subsegop','cemaden'], name:null, adminPassword: password });
-      logEvent('login', 'Admin', 'Entrou como administrador');
+      const setor = res.setor || null; // null = Master
+      enterApp({
+        role:'admin',
+        groups: setor ? [setor] : ['subsegop','cemaden','niiad'],
+        name:null, adminPassword: password, adminSetor: setor
+      });
+      logEvent('login', 'Admin', setor ? ('Entrou como administrador do setor ' + setor) : 'Entrou como administrador Master');
     } else {
       err.textContent = 'Senha incorreta.';
     }
@@ -1804,6 +1953,7 @@ setTimeout(function resumeSession(){
     currentLevels = saved.levels || {};
     currentUserName = saved.name || null;
     currentAdminPassword = saved.adminPassword || null;
+    currentAdminSetor = saved.adminSetor || null;
     document.getElementById('lock-screen').style.display = 'none';
     document.getElementById('app-content').style.display = 'block';
     applyRoleVisibility();
@@ -2328,9 +2478,105 @@ async function wireSupervisorPasswordCard_(setor){
   };
 }
 
+// Card "Aviso por e-mail" reutilizado nos 3 painéis de admin (item: notificação de troca aprovada).
+async function wireSectorNotifyEmailsCard_(setor){
+  const supInput = document.getElementById('notify-sup-email-' + setor);
+  const extraInput = document.getElementById('notify-extra-email-' + setor);
+  const saveBtn = document.getElementById('notify-save-' + setor);
+  const msgEl = document.getElementById('notify-status-msg-' + setor);
+  if(!saveBtn) return;
+  try{
+    const res = await backendGetSectorNotifyEmails(setor, currentAdminPassword);
+    if(res.ok){
+      supInput.value = (res.emails && res.emails.supervisorEmail) || '';
+      extraInput.value = (res.emails && res.emails.extraEmail) || '';
+    }
+  }catch(e){
+    console.error('Erro ao carregar e-mails de aviso:', e);
+  }
+  saveBtn.onclick = async ()=>{
+    try{
+      const res = await backendSetSectorNotifyEmails(setor, supInput.value.trim(), extraInput.value.trim(), currentAdminPassword);
+      if(!res.ok) throw new Error(res.error || 'erro ao salvar');
+      msgEl.style.color = '#22c55e';
+      msgEl.textContent = 'E-mails de aviso salvos.';
+      logEvent('admin', 'Admin', 'Atualizou e-mails de aviso de troca (' + setor + ')');
+    }catch(e){
+      msgEl.style.color = '#f87171';
+      msgEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : 'tente novamente.');
+    }
+    setTimeout(()=> msgEl.textContent='', 4000);
+  };
+}
+
+// Card "Acesso de administrador deste setor" reutilizado nos 3 painéis de
+// admin: Master vê o campo de redefinir a senha do admin do setor; o próprio
+// admin do setor (logado nele) vê o campo de trocar a própria senha.
+function wireSectorAdminPasswordCard_(setor){
+  const card = document.getElementById('admin-pw-card-' + setor);
+  const masterBlock = document.getElementById('admin-pw-master-block-' + setor);
+  const selfBlock = document.getElementById('admin-pw-self-block-' + setor);
+  if(!card) return;
+  const isMasterAdmin = currentRole === 'admin' && !currentAdminSetor;
+  const isThisSectorAdmin = currentRole === 'admin' && currentAdminSetor === setor;
+  card.style.display = (isMasterAdmin || isThisSectorAdmin) ? 'block' : 'none';
+  masterBlock.style.display = isMasterAdmin ? 'block' : 'none';
+  selfBlock.style.display = isThisSectorAdmin ? 'block' : 'none';
+
+  if(isMasterAdmin){
+    const input = document.getElementById('admin-pw-master-input-' + setor);
+    const saveBtn = document.getElementById('admin-pw-master-save-' + setor);
+    const msgEl = document.getElementById('admin-pw-master-msg-' + setor);
+    saveBtn.onclick = async ()=>{
+      const newPassword = input.value.trim();
+      if(!newPassword){ msgEl.style.color = '#f87171'; msgEl.textContent = 'Digite a nova senha.'; return; }
+      try{
+        const res = await backendSetSectorAdminPassword(setor, newPassword, currentAdminPassword);
+        if(!res.ok) throw new Error(res.error || 'erro ao salvar');
+        input.value = '';
+        msgEl.style.color = '#22c55e';
+        msgEl.textContent = 'Senha redefinida.';
+        logEvent('admin', 'Admin', 'Redefiniu a senha do admin do setor ' + setor);
+      }catch(e){
+        msgEl.style.color = '#f87171';
+        msgEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : 'tente novamente.');
+      }
+      setTimeout(()=> msgEl.textContent='', 4000);
+    };
+  }
+
+  if(isThisSectorAdmin){
+    const oldInput = document.getElementById('admin-pw-self-old-' + setor);
+    const newInput = document.getElementById('admin-pw-self-new-' + setor);
+    const saveBtn = document.getElementById('admin-pw-self-save-' + setor);
+    const msgEl = document.getElementById('admin-pw-self-msg-' + setor);
+    saveBtn.onclick = async ()=>{
+      const oldPassword = oldInput.value.trim();
+      const newPassword = newInput.value.trim();
+      if(!oldPassword || !newPassword){ msgEl.style.color = '#f87171'; msgEl.textContent = 'Preencha a senha atual e a nova.'; return; }
+      try{
+        const res = await backendChangeSectorAdminPassword(setor, oldPassword, newPassword);
+        if(!res.ok) throw new Error(res.error === 'senha atual incorreta' ? 'senha atual incorreta' : (res.error || 'erro ao salvar'));
+        oldInput.value = ''; newInput.value = '';
+        currentAdminPassword = newPassword; // a sessão atual continua logada, agora com a nova senha
+        saveSession();
+        msgEl.style.color = '#22c55e';
+        msgEl.textContent = 'Senha alterada.';
+        logEvent('admin', 'Admin', 'Trocou a própria senha de admin (' + setor + ')');
+      }catch(e){
+        msgEl.style.color = '#f87171';
+        msgEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : 'tente novamente.');
+      }
+      setTimeout(()=> msgEl.textContent='', 4000);
+    };
+  }
+}
+
 /* ---------- SUBSEGOP: aba Configurar (admin) ---------- */
 async function loadRosterPanel(){
   wireSupervisorPasswordCard_('subsegop');
+  wireSectorNotifyEmailsCard_('subsegop');
+  wireSectorAdminPasswordCard_('subsegop');
   const { weekStart, released, activeDays, roster } = await getExpedienteBundle_();
   const weekInput = document.getElementById('week-start');
   weekInput.value = weekStart ? weekStart : getNextMondayISO();
@@ -2851,6 +3097,7 @@ async function sSwapDecide_(id, approve){
       req.status = 'aprovada';
       // SUBSEGOP Serviço Mensal não distingue tipo de serviço (sem ORD/RAS) — typeLabel fica de fora.
       logEvent('admin', 'Admin', 'Aprovou troca (SUBSEGOP Serviço Mensal) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
+      backendNotifySwapApproved('subsegop', 'SUBSEGOP Serviço Mensal', await getSMonth(), req.day, req.fromName, req.toName);
     }
   } else {
     req.status = 'recusada_admin';
@@ -3694,6 +3941,7 @@ async function cSwapDecide_(id, approve){
       req.status = 'aprovada';
       // CEMADEN não distingue tipo de serviço (sem ORD/RAS) — typeLabel fica de fora.
       logEvent('admin', 'Admin', 'Aprovou troca (CEMADEN) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
+      backendNotifySwapApproved('cemaden', 'CEMADEN', await getCMonth(), req.day, req.fromName, req.toName);
     }
   } else {
     req.status = 'recusada_admin';
@@ -4058,6 +4306,8 @@ document.getElementById('c-export-csv-btn').onclick = async ()=>{
 /* ---------- CEMADEN: aba Configurar (admin) ---------- */
 async function loadCAdminPanel(){
   wireSupervisorPasswordCard_('cemaden');
+  wireSectorNotifyEmailsCard_('cemaden');
+  wireSectorAdminPasswordCard_('cemaden');
   const bundle = await getCBundle_();
   const { month, released, roster } = bundle;
   const monthInput = document.getElementById('c-month-input');
@@ -4570,6 +4820,7 @@ async function nSwapDecide_(id, approve){
       req.status = 'aprovada';
       req.typeLabel = norm.ord ? 'ORD' : 'RAS'; // NIIAD: só é ORD quando a vaga é Ordinário; preto e vermelho são RAS.
       logEvent('admin', 'Admin', 'Aprovou troca (NIIAD) — dia ' + req.day + ': ' + before + ' → ' + nSlotNames_(slots).join(', '));
+      backendNotifySwapApproved('niiad', 'NIIAD', await getNMonth(), req.day, req.fromName, req.toName);
     }
   } else {
     req.status = 'recusada_admin';
@@ -4967,6 +5218,8 @@ document.getElementById('n-export-csv-btn').onclick = async ()=>{
 /* ---------- NIIAD: aba Configurar (admin) ---------- */
 async function loadNAdminPanel(){
   wireSupervisorPasswordCard_('niiad');
+  wireSectorNotifyEmailsCard_('niiad');
+  wireSectorAdminPasswordCard_('niiad');
   const bundle = await getNBundle_();
   const { month, released, roster } = bundle;
   const monthInput = document.getElementById('n-month-input');
