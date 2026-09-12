@@ -1140,7 +1140,7 @@
 
   <div class="schedule-wrap" id="vd-summary-wrap" style="margin-top:16px;max-width:640px;">
     <div class="schedule-title">QUEM ESTÁ DE SERVIÇO — <span id="vd-date-label"></span></div>
-    <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+    <div style="padding:14px;display:flex;flex-direction:column;gap:12px;color:#1e293b;">
       <div><strong>Plantão SUBSEGOP:</strong> <span id="vd-subsegop">—</span></div>
       <div><strong>Of. Ligação CEMADEN:</strong> <span id="vd-cemaden">—</span></div>
       <div><strong>Adm Comitê El Niño:</strong> <span id="vd-elnino">—</span></div>
@@ -1555,11 +1555,15 @@ const SWAP_STATUS_LABELS_ = {
   cancelada: '⚪ Cancelada por quem propôs',
   desfeita: '⚪ Desfeita pelo admin — a vaga voltou para quem tinha antes'
 };
+// Fica dentro de um .schedule-wrap (fundo branco fixo, pensado pra exportar
+// como imagem) — por isso cor de texto escura fixa aqui, não var(--text)/
+// var(--muted) (cores claras do tema escuro do app, quase invisíveis no
+// branco).
 function swapRowHtml_(req, buttonsHtml){
-  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;">
-    <div style="font-size:13px;color:var(--text);">
+  return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;">
+    <div style="font-size:13px;color:#1e293b;">
       Dia <strong>${req.day}</strong>: <strong>${req.fromName}</strong> → <strong>${req.toName}</strong>
-      <div style="font-size:11px;color:var(--muted);">${SWAP_STATUS_LABELS_[req.status] || req.status}</div>
+      <div style="font-size:11px;color:#64748b;">${SWAP_STATUS_LABELS_[req.status] || req.status}</div>
     </div>
     <div style="display:flex;gap:8px;flex:none;">${buttonsHtml || ''}</div>
   </div>`;
@@ -1591,11 +1595,11 @@ function renderSwapHistory_(elId, swaps){
     .sort((a,b)=> (b.decidedAt||b.respondedAt||b.createdAt||'').localeCompare(a.decidedAt||a.respondedAt||a.createdAt||''));
   el.innerHTML = hist.length
     ? hist.map(req=> swapRowHtml_(req, '')).join('')
-    : '<p style="color:var(--muted);font-size:13px;margin:0;">Nada no histórico ainda.</p>';
+    : '<p style="color:#64748b;font-size:13px;margin:0;">Nada no histórico ainda.</p>';
 }
 
 function swapListHtml_(list, emptyMsg, buttonsFor){
-  if(!list.length) return `<p style="color:var(--muted);font-size:13px;margin:0;">${emptyMsg}</p>`;
+  if(!list.length) return `<p style="color:#64748b;font-size:13px;margin:0;">${emptyMsg}</p>`;
   return list.slice().reverse().map(req=> swapRowHtml_(req, buttonsFor ? buttonsFor(req) : '')).join('');
 }
 // Pra colorir a escala compilada: dia → Set com os nomes que ocuparam a vaga
@@ -3778,7 +3782,7 @@ function renderSSummaryTable_(roster, assignments, dayTypes, month){
     html += `<tr><td class="nome-c">${r.name}</td><td>${r.preta}</td><td>${r.sexta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
   });
   if(rows.length){
-    html += `<tr style="font-weight:700;background:var(--card2);"><td class="nome-c">Total geral</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'sexta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
+    html += `<tr style="font-weight:700;background:#dbeafe;color:#1e293b;"><td class="nome-c" style="background:#dbeafe;">Total geral</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'sexta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
   }
   html += '</tbody>';
   table.innerHTML = html;
@@ -4610,7 +4614,7 @@ function renderCSummaryTable_(roster, assignments, dayTypes, month){
     html += `<tr><td class="nome-c">${r.name}</td><td>${r.preta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
   });
   if(rows.length){
-    html += `<tr style="font-weight:700;background:var(--card2);"><td class="nome-c">Total geral</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
+    html += `<tr style="font-weight:700;background:#dbeafe;color:#1e293b;"><td class="nome-c" style="background:#dbeafe;">Total geral</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
   }
   html += '</tbody>';
   table.innerHTML = html;
@@ -5512,7 +5516,7 @@ function renderENSummaryTable_(roster, assignments, dayTypes, month){
     html += `<tr><td class="nome-c">${r.name}</td><td>${r.preta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
   });
   if(rows.length){
-    html += `<tr style="font-weight:700;background:var(--card2);"><td class="nome-c">Total geral</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
+    html += `<tr style="font-weight:700;background:#dbeafe;color:#1e293b;"><td class="nome-c" style="background:#dbeafe;">Total geral</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
   }
   html += '</tbody>';
   table.innerHTML = html;
@@ -6370,7 +6374,7 @@ function renderNSummaryTable_(roster, assignments, dayTypes, month){
     html += `<tr><td class="nome-c">${r.name}</td><td>${r.ordinario}</td><td>${r.preta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
   });
   if(rows.length){
-    html += `<tr style="font-weight:700;background:var(--card2);"><td class="nome-c">Total geral</td><td>${sumFeitoCota_(rows,'ordinario')}</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
+    html += `<tr style="font-weight:700;background:#dbeafe;color:#1e293b;"><td class="nome-c" style="background:#dbeafe;">Total geral</td><td>${sumFeitoCota_(rows,'ordinario')}</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
   }
   html += '</tbody>';
   table.innerHTML = html;
@@ -6737,7 +6741,7 @@ function gestorAuthPassword_(){
 }
 
 function visaoDiaLine_(names){
-  return names.length ? names.join(' e ') : '— (não preenchido)';
+  return names.length ? names.join(' e ') : 'Não há';
 }
 
 // Uma única ida ao servidor: mês + vagas das 4 funções, e os efetivos
