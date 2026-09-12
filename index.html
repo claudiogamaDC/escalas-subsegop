@@ -760,7 +760,7 @@
 
   <div class="roster-card">
     <label style="margin-top:0;">Efetivo (nome + posto/graduação + cota)</label>
-    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">O <strong>posto/graduação</strong> define a ordem de antiguidade — e é também a ordem da fila de escolha. Use as setas <strong>▲▼</strong> pra ajustar dentro do mesmo posto. Preencha quantos dias <strong>pretos</strong> e <strong>vermelhos</strong> (RAS) cada pessoa deve fazer neste período. Campo "Nova senha": deixe em branco pra manter a atual.</p>
+    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">O <strong>posto/graduação</strong> define a ordem de antiguidade — e é também a ordem da fila de escolha. Use as setas <strong>▲▼</strong> pra ajustar dentro do mesmo posto. Preencha quantos dias <strong>pretos</strong> e <strong>vermelhos</strong> (RAS) cada pessoa deve fazer neste período. Campo "Nova senha": deixe em branco pra manter a atual.<br>Marque <strong>"Comitê El Niño"</strong> pra incluir a pessoa também na escala do Adm Comitê El Niño (mesmo efetivo do CEMADEN — só quem for marcado entra na fila de lá) e preencha a cota preta/vermelha própria dessa escala.</p>
     <div id="c-roster-list"></div>
     <button class="add-row-btn" id="c-add-roster-btn">+ Adicionar pessoa</button>
     <button class="save-btn" id="c-save-roster-btn">Salvar efetivo</button>
@@ -910,12 +910,8 @@
   </div>
 
   <div class="roster-card">
-    <label style="margin-top:0;">Efetivo (nome + posto/graduação + cota)</label>
-    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">O <strong>posto/graduação</strong> define a ordem de antiguidade — e é também a ordem da fila de escolha. Use as setas <strong>▲▼</strong> pra ajustar dentro do mesmo posto. Preencha quantos dias <strong>pretos</strong> e <strong>vermelhos</strong> (RAS) cada pessoa deve fazer neste período. Campo "Nova senha": deixe em branco pra manter a atual.</p>
-    <div id="en-roster-list"></div>
-    <button class="add-row-btn" id="en-add-roster-btn">+ Adicionar pessoa</button>
-    <button class="save-btn" id="en-save-roster-btn">Salvar efetivo</button>
-    <div class="status" id="en-roster-status"></div>
+    <label style="margin-top:0;">Efetivo</label>
+    <p style="font-size:12px;color:var(--muted);margin:0;">Quem participa desta escala é o mesmo efetivo do CEMADEN — vá em <strong>Configurar CEMADEN</strong> e marque a caixinha <strong>"Comitê El Niño"</strong> ao lado de cada pessoa (com a cota preta/vermelha própria desta escala). Não tem cadastro separado aqui.</p>
   </div>
 </div>
 
@@ -1717,23 +1713,11 @@ async function populateLoginNameSelect(attempt){
   const setor = setorSelect ? setorSelect.value : 'subsegop';
   select.innerHTML = '<option value="">Carregando...</option>';
   try{
-    let people;
-    if(setor === 'cemaden'){
-      // Junta Of de Ligação + Adm Comitê El Niño (efetivos distintos, mas
-      // dentro do mesmo setor/aba) — sem isso, quem só está cadastrado no
-      // Comitê El Niño não aparece pra escolher o próprio nome no login.
-      const [cPeople, enPeople] = await Promise.all([
-        getCRoster().then(list=> list.map(normalizeCPerson_)),
-        getENRoster().then(list=> list.map(normalizeENPerson_))
-      ]);
-      const byName = new Map();
-      cPeople.concat(enPeople).forEach(p=>{ if(p && p.name && !byName.has(p.name)) byName.set(p.name, p); });
-      people = Array.from(byName.values());
-    } else if(setor === 'niiad'){
-      people = await getNRoster();
-    } else {
-      people = await getRoster();
-    }
+    const people = setor === 'cemaden'
+      ? (await getCRoster()).map(normalizeCPerson_)
+      : setor === 'niiad'
+      ? await getNRoster()
+      : await getRoster();
     const sorted = sortByRank_(people.filter(p=> p && p.name));
     select.innerHTML = '<option value="">-- selecione --</option>' +
       sorted.map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
@@ -4490,7 +4474,7 @@ async function loadCAdminPanel(){
 
   const listEl = document.getElementById('c-roster-list');
   listEl.innerHTML = '';
-  sortByRank_(roster).forEach(p => addCRosterRow(p.name, p.level, p.rank, p.quotaPreto, p.quotaVermelho));
+  sortByRank_(roster).forEach(p => addCRosterRow(p.name, p.level, p.rank, p.quotaPreto, p.quotaVermelho, p.elninoParticipa, p.elninoQuotaPreto, p.elninoQuotaVermelho));
 
   monthInput.onchange = renderCDayTypesEditor;
 }
@@ -4637,7 +4621,7 @@ document.getElementById('c-save-month-btn').onclick = async ()=>{
   }
 };
 
-function addCRosterRow(name="", level="simples", rank="", quotaPreto=0, quotaVermelho=0){
+function addCRosterRow(name="", level="simples", rank="", quotaPreto=0, quotaVermelho=0, elninoParticipa=false, elninoQuotaPreto=0, elninoQuotaVermelho=0){
   const listEl = document.getElementById('c-roster-list');
   const row = document.createElement('div');
   row.className = 'roster-row';
@@ -4658,10 +4642,19 @@ function addCRosterRow(name="", level="simples", rank="", quotaPreto=0, quotaVer
     <input type="text" placeholder="Nova senha" class="roster-password-input" style="flex:0 0 130px;" autocomplete="off">
     <input type="number" min="0" value="${quotaPreto||0}" placeholder="Cota preta" class="c-quota-preto-input" style="flex:0 0 90px;" title="Cota de dias pretos">
     <input type="number" min="0" value="${quotaVermelho||0}" placeholder="Cota vermelha" class="c-quota-vermelho-input" style="flex:0 0 100px;" title="Cota de dias vermelhos (RAS)">
+    <label style="display:flex;align-items:center;gap:4px;font-size:12px;font-weight:400;flex:0 0 auto;white-space:nowrap;" title="Se marcado, essa pessoa entra na fila do Adm Comitê El Niño">
+      <input type="checkbox" class="c-elnino-participa-input" ${elninoParticipa?'checked':''}> Comitê El Niño
+    </label>
+    <input type="number" min="0" value="${elninoQuotaPreto||0}" placeholder="Cota preta (El Niño)" class="c-elnino-quota-preto-input" style="flex:0 0 100px;" title="Cota de dias pretos no Adm Comitê El Niño" ${elninoParticipa?'':'disabled'}>
+    <input type="number" min="0" value="${elninoQuotaVermelho||0}" placeholder="Cota vermelha (El Niño)" class="c-elnino-quota-vermelho-input" style="flex:0 0 110px;" title="Cota de dias vermelhos (RAS) no Adm Comitê El Niño" ${elninoParticipa?'':'disabled'}>
     <button class="roster-remove-btn">Remover</button>`;
   row.querySelector('.roster-remove-btn').onclick = ()=> row.remove();
   row.querySelector('.row-move-up').onclick = ()=> moveRow_(row).up();
   row.querySelector('.row-move-down').onclick = ()=> moveRow_(row).down();
+  row.querySelector('.c-elnino-participa-input').onchange = (e)=>{
+    row.querySelector('.c-elnino-quota-preto-input').disabled = !e.target.checked;
+    row.querySelector('.c-elnino-quota-vermelho-input').disabled = !e.target.checked;
+  };
   listEl.appendChild(row);
 }
 document.getElementById('c-add-roster-btn').onclick = ()=> addCRosterRow();
@@ -4676,9 +4669,12 @@ document.getElementById('c-save-roster-btn').onclick = async ()=>{
     const level = r.querySelector('.roster-level-select').value;
     const quotaPreto = Number(r.querySelector('.c-quota-preto-input').value) || 0;
     const quotaVermelho = Number(r.querySelector('.c-quota-vermelho-input').value) || 0;
+    const elninoParticipa = r.querySelector('.c-elnino-participa-input').checked;
+    const elninoQuotaPreto = Number(r.querySelector('.c-elnino-quota-preto-input').value) || 0;
+    const elninoQuotaVermelho = Number(r.querySelector('.c-elnino-quota-vermelho-input').value) || 0;
     const newPassword = r.querySelector('.roster-password-input').value.trim();
     if(name){
-      roster.push({name, level, rank, quotaPreto, quotaVermelho});
+      roster.push({name, level, rank, quotaPreto, quotaVermelho, elninoParticipa, elninoQuotaPreto, elninoQuotaVermelho});
       if(newPassword) pendingPasswords.push({name, newPassword});
     }
   });
@@ -4726,27 +4722,36 @@ document.getElementById('c-clear-data-btn').onclick = async ()=>{
 /* ============================================================
    ADM COMITÊ EL NIÑO — dados e constantes
    (dentro da aba OF LIG CEMADEN: mesmo modelo do CEMADEN — fila
-   por antiguidade, cotas Preta/Vermelha, 1 vaga/dia — mas com
-   efetivo, mês, cotas e vagas próprios e independentes. Senha de
-   supervisão/admin do setor e e-mail de aviso continuam sendo os
-   mesmos do CEMADEN, configurados só em Configurar CEMADEN.)
+   por antiguidade, cotas Preta/Vermelha, 1 vaga/dia — mas com mês e
+   vagas próprios. Sem efetivo próprio: usa o mesmo efetivo do CEMADEN
+   (cemaden_roster), e só entra na fila quem estiver marcado com
+   elninoParticipa=true em Configurar CEMADEN, com cota preta/vermelha
+   própria dessa escala. Senha de supervisão/admin do setor e e-mail de
+   aviso também continuam sendo os mesmos do CEMADEN, configurados só
+   em Configurar CEMADEN.)
    ============================================================ */
-const K_EN_ROSTER = "elnino_roster";
 const K_EN_MONTH = "elnino_month";
 const K_EN_DAYTYPES = "elnino_daytypes";
 const K_EN_ASSIGN = "elnino_assign";
 const K_EN_RELEASED = "elnino_liberado";
 const K_EN_SKIPPED = "elnino_pulados";
 const K_EN_OBS = "elnino_observacoes";
-function normalizeENPerson_(p){
-  // Compatibilidade com formatos antigos.
-  if(typeof p === 'string') return { name: p, level: 'simples', rank: '' };
-  return p || { name: '', level: 'simples', rank: '' };
-}
 
+// Sem efetivo próprio: o Adm Comitê El Niño usa o mesmo efetivo do CEMADEN
+// (K_C_ROSTER) — só entra na fila quem estiver marcado com
+// elninoParticipa=true em Configurar CEMADEN, com a cota preta/vermelha
+// própria dessa escala (elninoQuotaPreto/elninoQuotaVermelho).
+function enRosterFromC_(cRoster){
+  return (cRoster||[]).filter(p=> p && p.name && p.elninoParticipa).map(p=> ({
+    name: p.name,
+    rank: p.rank,
+    level: p.level,
+    quotaPreto: Number(p.elninoQuotaPreto)||0,
+    quotaVermelho: Number(p.elninoQuotaVermelho)||0
+  }));
+}
 async function getENRoster(){
-  try{ const r = await window.storage.get(K_EN_ROSTER, true); return r ? JSON.parse(r.value) : []; }
-  catch(e){ return []; }
+  return enRosterFromC_((await getCRoster()).map(normalizeCPerson_));
 }
 async function getENMonth(){
   try{ const r = await window.storage.get(K_EN_MONTH, true); return r ? JSON.parse(r.value) : null; }
@@ -4785,9 +4790,10 @@ async function getENObs(){
 // incluir obs/swaps aqui não deixa a chamada mais lenta (a leitura em lote
 // já traz tudo do armazenamento de uma vez) e evita uma leitura separada.
 async function getENBundle_(){
-  const batch = await window.storage.getBatch([K_EN_ROSTER, K_EN_DAYTYPES, K_EN_ASSIGN, K_EN_SKIPPED, K_EN_RELEASED, K_EN_MONTH, K_EN_OBS, K_EN_SWAPS]);
+  const batch = await window.storage.getBatch([K_C_ROSTER, K_EN_DAYTYPES, K_EN_ASSIGN, K_EN_SKIPPED, K_EN_RELEASED, K_EN_MONTH, K_EN_OBS, K_EN_SWAPS]);
+  const cRoster = parseBatchValue_(batch, K_C_ROSTER, []).map(normalizeCPerson_);
   return {
-    roster: parseBatchValue_(batch, K_EN_ROSTER, []).map(normalizeENPerson_),
+    roster: enRosterFromC_(cRoster),
     dayTypes: parseBatchValue_(batch, K_EN_DAYTYPES, {}),
     assignments: parseBatchValue_(batch, K_EN_ASSIGN, {}),
     skipped: parseBatchValue_(batch, K_EN_SKIPPED, []),
@@ -5352,17 +5358,13 @@ async function loadENAdminPanel(){
   // As senhas de supervisão/admin do setor e o e-mail de aviso já são
   // configurados em Configurar CEMADEN — não repete os cards aqui.
   const bundle = await getENBundle_();
-  const { month, released, roster } = bundle;
+  const { month, released } = bundle;
   const monthInput = document.getElementById('en-month-input');
   monthInput.value = month ? month : getNextMonthISO();
 
   updateENReleaseAdminUI(released);
 
   await Promise.all([renderENDayTypesEditor(bundle), renderENTurnAdmin(bundle)]);
-
-  const listEl = document.getElementById('en-roster-list');
-  listEl.innerHTML = '';
-  sortByRank_(roster).forEach(p => addENRosterRow(p.name, p.level, p.rank, p.quotaPreto, p.quotaVermelho));
 
   monthInput.onchange = renderENDayTypesEditor;
 }
@@ -5507,73 +5509,6 @@ document.getElementById('en-save-month-btn').onclick = async ()=>{
   } catch(e){
     alert('Erro ao salvar: ' + (e && e.message ? e.message : 'armazenamento indisponível.'));
   }
-};
-
-function addENRosterRow(name="", level="simples", rank="", quotaPreto=0, quotaVermelho=0){
-  const listEl = document.getElementById('en-roster-list');
-  const row = document.createElement('div');
-  row.className = 'roster-row';
-  row.innerHTML = `
-    <div style="display:flex;flex-direction:column;gap:2px;flex:none;">
-      <button type="button" class="row-move-up" title="Mover para cima (mais antigo)" style="padding:2px 6px;font-size:10px;background:var(--card2);border:1px solid var(--border);border-radius:4px;color:var(--text);cursor:pointer;">▲</button>
-      <button type="button" class="row-move-down" title="Mover para baixo (mais moderno)" style="padding:2px 6px;font-size:10px;background:var(--card2);border:1px solid var(--border);border-radius:4px;color:var(--text);cursor:pointer;">▼</button>
-    </div>
-    <input type="text" value="${name}" placeholder="Nome (sem o posto)" class="roster-name-input">
-    <select class="roster-rank-select">
-      <option value="">-- posto/grad. --</option>
-      ${RANK_ORDER.map(r=>`<option value="${r}" ${rank===r?'selected':''}>${r}</option>`).join('')}
-    </select>
-    <select class="roster-level-select">
-      <option value="simples" ${level!=='responsavel'?'selected':''}>Usuário simples</option>
-      <option value="responsavel" ${level==='responsavel'?'selected':''}>Usuário responsável</option>
-    </select>
-    <input type="text" placeholder="Nova senha" class="roster-password-input" style="flex:0 0 130px;" autocomplete="off">
-    <input type="number" min="0" value="${quotaPreto||0}" placeholder="Cota preta" class="en-quota-preto-input" style="flex:0 0 90px;" title="Cota de dias pretos">
-    <input type="number" min="0" value="${quotaVermelho||0}" placeholder="Cota vermelha" class="en-quota-vermelho-input" style="flex:0 0 100px;" title="Cota de dias vermelhos (RAS)">
-    <button class="roster-remove-btn">Remover</button>`;
-  row.querySelector('.roster-remove-btn').onclick = ()=> row.remove();
-  row.querySelector('.row-move-up').onclick = ()=> moveRow_(row).up();
-  row.querySelector('.row-move-down').onclick = ()=> moveRow_(row).down();
-  listEl.appendChild(row);
-}
-document.getElementById('en-add-roster-btn').onclick = ()=> addENRosterRow();
-
-document.getElementById('en-save-roster-btn').onclick = async ()=>{
-  const rows = document.querySelectorAll('#en-roster-list .roster-row');
-  const roster = [];
-  const pendingPasswords = [];
-  rows.forEach(r=>{
-    const name = r.querySelector('.roster-name-input').value.trim();
-    const rank = r.querySelector('.roster-rank-select').value;
-    const level = r.querySelector('.roster-level-select').value;
-    const quotaPreto = Number(r.querySelector('.en-quota-preto-input').value) || 0;
-    const quotaVermelho = Number(r.querySelector('.en-quota-vermelho-input').value) || 0;
-    const newPassword = r.querySelector('.roster-password-input').value.trim();
-    if(name){
-      roster.push({name, level, rank, quotaPreto, quotaVermelho});
-      if(newPassword) pendingPasswords.push({name, newPassword});
-    }
-  });
-  const statusEl = document.getElementById('en-roster-status');
-  try{
-    const prevRoster = (await getENRoster()).map(normalizeENPerson_);
-    await window.storage.set(K_EN_ROSTER, JSON.stringify(roster), true);
-    // Em paralelo em vez de uma de cada vez — se o admin troca a senha de
-    // várias pessoas junto, isso evita esperar N idas ao servidor em fila.
-    const passwordResults = await Promise.all(
-      pendingPasswords.map(p=> backendSetPassword(p.name, p.newPassword, currentAdminPassword))
-    );
-    const failedPassword = passwordResults.find(res=> !res.ok);
-    if(failedPassword) throw new Error(failedPassword.error || 'erro ao definir senha');
-    rows.forEach(r=> r.querySelector('.roster-password-input').value = '');
-    logEvent('admin', 'Admin', 'Salvou efetivo Adm Comitê El Niño (' + roster.length + ' pessoas)' + (pendingPasswords.length ? ', ' + pendingPasswords.length + ' senha(s) alterada(s)' : '') + ' — ' + diffRoster_(prevRoster, roster));
-    statusEl.style.color = '#22c55e';
-    statusEl.textContent = 'Efetivo salvo com sucesso.' + (pendingPasswords.length ? ' Senhas atualizadas.' : '');
-  } catch(e){
-    statusEl.style.color = '#f87171';
-    statusEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : 'armazenamento indisponível.');
-  }
-  setTimeout(()=> statusEl.textContent='', 4000);
 };
 
 document.getElementById('en-clear-data-btn').onclick = async ()=>{
