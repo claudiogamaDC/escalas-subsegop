@@ -214,6 +214,8 @@
         <a href="#" id="show-admin-login" style="color:var(--muted);font-size:12px;">Sou administrador</a>
         &nbsp;·&nbsp;
         <a href="#" id="show-supervisor-login" style="color:var(--muted);font-size:12px;">Sou supervisor</a>
+        &nbsp;·&nbsp;
+        <a href="#" id="show-gestor-login" style="color:var(--muted);font-size:12px;">Sou gestor</a>
       </p>
     </div>
     <div id="login-admin-form" style="display:none;">
@@ -246,6 +248,15 @@
       <button id="supervisor-login-btn">Entrar</button>
       <div id="supervisor-login-error"></div>
       <p style="margin-top:16px;"><a href="#" id="show-user-login-from-supervisor" style="color:var(--muted);font-size:12px;">Voltar</a></p>
+    </div>
+    <div id="login-gestor-form" style="display:none;">
+      <h2>Acesso de gestor</h2>
+      <p>Digite a senha de gestor</p>
+      <label style="margin-top:0;">Senha</label>
+      <input type="password" id="gestor-password-input" placeholder="••••••••">
+      <button id="gestor-login-btn">Entrar</button>
+      <div id="gestor-login-error"></div>
+      <p style="margin-top:16px;"><a href="#" id="show-user-login-from-gestor" style="color:var(--muted);font-size:12px;">Voltar</a></p>
     </div>
   </div>
 </div>
@@ -301,6 +312,13 @@
     <div class="tab-group-label">ADMINISTRAÇÃO</div>
     <div class="tab-group-row">
       <div class="tab" data-panel="log-uso" data-admin-only="true" data-master-only="true">Histórico de Uso</div>
+    </div>
+  </div>
+
+  <div class="tab-group">
+    <div class="tab-group-label">VISÃO DO DIA</div>
+    <div class="tab-group-row">
+      <div class="tab" data-panel="visao-dia" data-gestor-view="true">Visão do Dia</div>
     </div>
   </div>
 </div>
@@ -1112,6 +1130,62 @@
   </div>
 </div>
 
+<!-- ======================= VISÃO DO DIA ======================= -->
+<div class="panel" id="panel-visao-dia">
+  <div class="card" style="max-width:640px;">
+    <label style="margin-top:0;">Dia</label>
+    <input type="date" id="vd-date-input">
+    <button class="save-btn" id="vd-refresh-btn" style="margin-top:10px;width:auto;padding:8px 16px;">Atualizar</button>
+  </div>
+
+  <div class="schedule-wrap" id="vd-summary-wrap" style="margin-top:16px;max-width:640px;">
+    <div class="schedule-title">QUEM ESTÁ DE SERVIÇO — <span id="vd-date-label"></span></div>
+    <div style="padding:14px;display:flex;flex-direction:column;gap:12px;">
+      <div><strong>Plantão SUBSEGOP:</strong> <span id="vd-subsegop">—</span></div>
+      <div><strong>Of. Ligação CEMADEN:</strong> <span id="vd-cemaden">—</span></div>
+      <div><strong>Adm Comitê El Niño:</strong> <span id="vd-elnino">—</span></div>
+      <div><strong>NIIAD:</strong> <span id="vd-niiad">—</span></div>
+    </div>
+  </div>
+
+  <div class="roster-card" style="max-width:640px;">
+    <label style="margin-top:0;">Compartilhar este dia</label>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="save-btn" id="vd-copy-btn" style="margin-top:0;width:auto;padding:8px 16px;">📋 Copiar texto</button>
+    </div>
+    <label style="margin-top:14px;font-size:12px;font-weight:400;">Enviar por e-mail agora</label>
+    <input type="text" id="vd-send-now-emails" placeholder="um ou mais e-mails, separados por vírgula" style="max-width:400px;">
+    <button class="save-btn" id="vd-send-now-btn" style="margin-top:8px;width:auto;padding:8px 16px;">Enviar agora</button>
+    <div class="status" id="vd-send-now-status"></div>
+  </div>
+
+  <div class="roster-card" style="max-width:640px;">
+    <label style="margin-top:0;">Envio automático diário</label>
+    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Todo dia, no horário escolhido, a Visão do Dia (do dia corrente) é enviada sozinha pra esses e-mails. Deixe a lista vazia e salve pra desligar o envio automático.</p>
+    <label style="font-size:12px;font-weight:400;">E-mails (separados por vírgula)</label>
+    <input type="text" id="vd-report-emails" placeholder="um ou mais e-mails, separados por vírgula" style="max-width:400px;">
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">Horário do envio</label>
+    <select id="vd-report-hour" style="max-width:120px;"></select>
+    <button class="save-btn" id="vd-report-save-btn" style="margin-top:10px;width:auto;padding:8px 16px;">Salvar envio automático</button>
+    <div class="status" id="vd-report-status"></div>
+  </div>
+
+  <div class="roster-card" id="vd-master-pw-card" style="display:none;">
+    <label style="margin-top:0;">Senha do Gestor</label>
+    <input type="password" id="vd-master-pw-input" placeholder="Redefinir senha do Gestor" style="max-width:280px;">
+    <button class="save-btn" id="vd-master-pw-save" style="margin-top:8px;width:auto;padding:8px 16px;">Redefinir senha</button>
+    <div class="status" id="vd-master-pw-msg"></div>
+  </div>
+
+  <div class="roster-card" id="vd-self-pw-card" style="display:none;">
+    <label style="margin-top:0;">Trocar minha senha de gestor</label>
+    <input type="password" id="vd-self-pw-old" placeholder="Senha atual" style="max-width:280px;">
+    <input type="password" id="vd-self-pw-new" placeholder="Nova senha" style="margin-top:8px;max-width:280px;">
+    <button class="save-btn" id="vd-self-pw-save" style="margin-top:8px;width:auto;padding:8px 16px;">Trocar senha</button>
+    <div class="status" id="vd-self-pw-msg"></div>
+  </div>
+</div>
+
 </div>
 
 <script>
@@ -1314,6 +1388,51 @@ async function backendGetSectorNotifyEmails(setor, adminPassword){
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
     body: JSON.stringify({ action:"get_sector_notify_emails", secret: BACKEND_SECRET, setor, adminPassword })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
+}
+async function backendSetGestorPassword(newPassword, adminPassword){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"set_gestor_password", secret: BACKEND_SECRET, newPassword, adminPassword })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
+}
+async function backendChangeGestorPassword(oldPassword, newPassword){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"change_gestor_password", secret: BACKEND_SECRET, oldPassword, newPassword })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
+}
+async function backendGetGestorReportConfig(password){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"get_gestor_report_config", secret: BACKEND_SECRET, password })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
+}
+async function backendSetGestorReportConfig(emails, hour, password){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"set_gestor_report_config", secret: BACKEND_SECRET, emails, hour, password })
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return await res.json();
+}
+async function backendSendDailyReportNow(date, recipients, password){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"send_daily_report_now", secret: BACKEND_SECRET, date, recipients, password })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -1590,18 +1709,19 @@ async function backendClearLogs(adminPassword){
 /* ============================================================
    ACESSO / PAPÉIS
    ============================================================ */
-let currentRole = null;        // 'admin' | 'user' | 'supervisor'
+let currentRole = null;        // 'admin' | 'user' | 'supervisor' | 'gestor'
 let currentGroups = [];        // ['subsegop'], ['cemaden'] ou os dois
 let currentLevels = {};        // { subsegop: 'simples'|'responsavel', cemaden: 'simples'|'responsavel' }
 let currentUserName = null;    // nome de quem logou (papel 'user')
 let currentAdminPassword = null; // guardada só em memória/sessão, só quando role === 'admin'
 let currentAdminSetor = null;    // null = admin Master (acesso total); 'subsegop'|'cemaden'|'niiad' = admin só daquele setor
+let currentGestorPassword = null; // guardada só em memória/sessão, só quando role === 'gestor'
 
 function saveSession(){
   try{
     sessionStorage.setItem('escalas_session', JSON.stringify({
       role: currentRole, groups: currentGroups, levels: currentLevels, name: currentUserName,
-      adminPassword: currentAdminPassword, adminSetor: currentAdminSetor
+      adminPassword: currentAdminPassword, adminSetor: currentAdminSetor, gestorPassword: currentGestorPassword
     }));
   }catch(e){}
 }
@@ -1622,6 +1742,7 @@ function enterApp(session){
   currentUserName = session.name || null;
   currentAdminPassword = session.adminPassword || null;
   currentAdminSetor = session.adminSetor || null;
+  currentGestorPassword = session.gestorPassword || null;
   document.getElementById('lock-screen').style.display = 'none';
   document.getElementById('app-content').style.display = 'block';
   saveSession();
@@ -1633,6 +1754,7 @@ function applyRoleVisibility(){
   const isMasterAdmin = isAdmin && !currentAdminSetor;
   const isSectorAdmin = isAdmin && !!currentAdminSetor;
   const isSupervisor = currentRole === 'supervisor';
+  const isGestor = currentRole === 'gestor';
   const groupLabels = { subsegop:'SUBSEGOP', cemaden:'Of. Lig. CEMADEN', niiad:'NIIAD' };
   const levelLabels = { simples:'simples', responsavel:'responsável' };
   document.getElementById('role-badge').textContent = isMasterAdmin
@@ -1641,11 +1763,13 @@ function applyRoleVisibility(){
     ? 'Administrador — ' + (groupLabels[currentAdminSetor] || currentAdminSetor) + ' (só este setor)'
     : isSupervisor
     ? 'Supervisão — ' + (groupLabels[currentGroups[0]] || currentGroups[0]) + ' (somente consulta)'
+    : isGestor
+    ? 'Gestor — Visão do Dia'
     : (currentUserName || '') + ' — ' + currentGroups.map(g=>
         `${groupLabels[g] || g} (${levelLabels[currentLevels[g]] || 'simples'})`
       ).join(' + ');
-  document.getElementById('change-password-btn').style.display = (isAdmin || isSupervisor) ? 'none' : 'inline-block';
-  document.getElementById('ics-link-btn').style.display = (isAdmin || isSupervisor) ? 'none' : 'inline-block';
+  document.getElementById('change-password-btn').style.display = (isAdmin || isSupervisor || isGestor) ? 'none' : 'inline-block';
+  document.getElementById('ics-link-btn').style.display = (isAdmin || isSupervisor || isGestor) ? 'none' : 'inline-block';
 
   let firstVisible = null;
   document.querySelectorAll('.tab').forEach(tab=>{
@@ -1653,14 +1777,15 @@ function applyRoleVisibility(){
     const adminOnlySetor = tab.dataset.adminOnlySetor || null;
     const masterOnly = tab.dataset.masterOnly === 'true';
     const group = tab.dataset.group;
+    const gestorView = tab.dataset.gestorView === 'true';
     let visible;
     if(isMasterAdmin){
       visible = true;
     } else if(isSectorAdmin){
       // Admin de setor: acesso completo (preenchimento, compilada, trocas,
       // "Configurar") mas só dentro do próprio setor — nunca Histórico
-      // (masterOnly) nem as abas dos outros setores.
-      if(masterOnly) visible = false;
+      // (masterOnly), Visão do Dia (gestorView) nem as abas de outros setores.
+      if(masterOnly || gestorView) visible = false;
       else if(adminOnly) visible = adminOnlySetor === currentAdminSetor;
       else visible = group === currentAdminSetor;
     } else if(isSupervisor){
@@ -1669,6 +1794,9 @@ function applyRoleVisibility(){
       const panel = tab.dataset.panel || '';
       const readOnlyPanel = panel.indexOf('compiled-') === 0 || panel.indexOf('swaps-') === 0;
       visible = !adminOnly && group && currentGroups.includes(group) && readOnlyPanel;
+    } else if(isGestor){
+      // Gestor só enxerga a Visão do Dia — nenhuma aba de setor nenhum.
+      visible = gestorView;
     } else {
       visible = !adminOnly && group && currentGroups.includes(group);
     }
@@ -1686,22 +1814,33 @@ function applyRoleVisibility(){
 function showAdminLoginForm(){
   document.getElementById('login-user-form').style.display = 'none';
   document.getElementById('login-supervisor-form').style.display = 'none';
+  document.getElementById('login-gestor-form').style.display = 'none';
   document.getElementById('login-admin-form').style.display = 'block';
 }
 function showSupervisorLoginForm(){
   document.getElementById('login-user-form').style.display = 'none';
   document.getElementById('login-admin-form').style.display = 'none';
+  document.getElementById('login-gestor-form').style.display = 'none';
   document.getElementById('login-supervisor-form').style.display = 'block';
+}
+function showGestorLoginForm(){
+  document.getElementById('login-user-form').style.display = 'none';
+  document.getElementById('login-admin-form').style.display = 'none';
+  document.getElementById('login-supervisor-form').style.display = 'none';
+  document.getElementById('login-gestor-form').style.display = 'block';
 }
 function showUserLoginForm(){
   document.getElementById('login-admin-form').style.display = 'none';
   document.getElementById('login-supervisor-form').style.display = 'none';
+  document.getElementById('login-gestor-form').style.display = 'none';
   document.getElementById('login-user-form').style.display = 'block';
 }
 document.getElementById('show-admin-login').onclick = (e)=>{ e.preventDefault(); showAdminLoginForm(); };
 document.getElementById('show-supervisor-login').onclick = (e)=>{ e.preventDefault(); showSupervisorLoginForm(); };
+document.getElementById('show-gestor-login').onclick = (e)=>{ e.preventDefault(); showGestorLoginForm(); };
 document.getElementById('show-user-login-from-admin').onclick = (e)=>{ e.preventDefault(); showUserLoginForm(); };
 document.getElementById('show-user-login-from-supervisor').onclick = (e)=>{ e.preventDefault(); showUserLoginForm(); };
+document.getElementById('show-user-login-from-gestor').onclick = (e)=>{ e.preventDefault(); showUserLoginForm(); };
 
 function sleep_(ms){ return new Promise(r=> setTimeout(r, ms)); }
 
@@ -1750,7 +1889,7 @@ document.getElementById('login-name-select').addEventListener('focus', ()=>{
 
 function logout(){
   clearSession();
-  currentRole = null; currentGroups = []; currentLevels = {}; currentUserName = null; currentAdminPassword = null; currentAdminSetor = null;
+  currentRole = null; currentGroups = []; currentLevels = {}; currentUserName = null; currentAdminPassword = null; currentAdminSetor = null; currentGestorPassword = null;
   document.getElementById('app-content').style.display = 'none';
   document.getElementById('lock-screen').style.display = 'flex';
   document.getElementById('login-password-input').value = '';
@@ -2068,6 +2207,32 @@ document.getElementById('supervisor-password-input').addEventListener('keydown',
   if(e.key === 'Enter') doSupervisorLogin();
 });
 
+async function doGestorLogin(){
+  const password = document.getElementById('gestor-password-input').value;
+  const err = document.getElementById('gestor-login-error');
+  err.textContent = '';
+  if(!password){ err.textContent = 'Digite a senha de gestor.'; return; }
+  const btn = document.getElementById('gestor-login-btn');
+  btn.disabled = true;
+  try{
+    const res = await backendLogin({ kind:'gestor', password });
+    if(res.ok){
+      enterApp({ role:'gestor', groups:[], levels:{}, name:null, adminPassword:null, gestorPassword: password });
+      logEvent('login', 'Gestor', 'Entrou como gestor');
+    } else {
+      err.textContent = 'Senha incorreta.';
+    }
+  }catch(e){
+    console.error('Erro no login de gestor:', e);
+    err.textContent = 'Erro ao entrar: ' + (e && e.message ? e.message : 'tente novamente.');
+  }
+  btn.disabled = false;
+}
+document.getElementById('gestor-login-btn').onclick = doGestorLogin;
+document.getElementById('gestor-password-input').addEventListener('keydown', e=>{
+  if(e.key === 'Enter') doGestorLogin();
+});
+
 /* ============================================================
    NAVEGAÇÃO (genérica para todas as abas)
    ============================================================ */
@@ -2105,6 +2270,7 @@ setTimeout(function resumeSession(){
     currentUserName = saved.name || null;
     currentAdminPassword = saved.adminPassword || null;
     currentAdminSetor = saved.adminSetor || null;
+    currentGestorPassword = saved.gestorPassword || null;
     document.getElementById('lock-screen').style.display = 'none';
     document.getElementById('app-content').style.display = 'block';
     applyRoleVisibility();
@@ -2134,6 +2300,7 @@ function loadPanel(name){
   else if(name === 'swaps-niiad') loadNSwapsPanel();
   else if(name === 'admin-niiad') loadNAdminPanel();
   else if(name === 'log-uso') loadLogPanel();
+  else if(name === 'visao-dia') loadVisaoDiaPanel();
 }
 
 /* ============================================================
@@ -3587,6 +3754,22 @@ function sSummaryRows_(roster, assignments, dayTypes, month){
   });
 }
 
+// Soma os valores "feito/cota" (ex.: "3/3") de uma coluna em todas as linhas
+// da tabela de distribuição, devolvendo já formatado "totalFeito/totalCota"
+// pra linha de total geral no rodapé. Reaproveitado pelas 4 escalas.
+function sumFeitoCota_(rows, key){
+  let feito = 0, cota = 0;
+  rows.forEach(r=>{
+    const parts = String(r[key]).split('/');
+    feito += Number(parts[0]) || 0;
+    cota += Number(parts[1]) || 0;
+  });
+  return feito + '/' + cota;
+}
+function sumTotal_(rows){
+  return rows.reduce((acc, r)=> acc + (Number(r.total) || 0), 0);
+}
+
 function renderSSummaryTable_(roster, assignments, dayTypes, month){
   const table = document.getElementById('s-summary-table');
   const rows = sSummaryRows_(roster, assignments, dayTypes, month);
@@ -3594,6 +3777,9 @@ function renderSSummaryTable_(roster, assignments, dayTypes, month){
   rows.forEach(r=>{
     html += `<tr><td class="nome-c">${r.name}</td><td>${r.preta}</td><td>${r.sexta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
   });
+  if(rows.length){
+    html += `<tr style="font-weight:700;background:var(--card2);"><td class="nome-c">Total geral</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'sexta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
+  }
   html += '</tbody>';
   table.innerHTML = html;
 }
@@ -3624,9 +3810,13 @@ document.getElementById('s-export-csv-btn').onclick = async ()=>{
   rows.push([]);
   rows.push(['Distribuição por pessoa']);
   rows.push(['Nome', 'Preta (feito/cota)', 'Sexta (feito/cota)', 'Vermelha (feito/cota)', 'Total']);
-  sSummaryRows_(sortByRank_(roster), assignments, dayTypes, month).forEach(r=>{
+  const sSummary = sSummaryRows_(sortByRank_(roster), assignments, dayTypes, month);
+  sSummary.forEach(r=>{
     rows.push([r.name, r.preta, r.sexta, r.vermelha, r.total]);
   });
+  if(sSummary.length){
+    rows.push(['Total geral', sumFeitoCota_(sSummary,'preta'), sumFeitoCota_(sSummary,'sexta'), sumFeitoCota_(sSummary,'vermelha'), sumTotal_(sSummary)]);
+  }
 
   try{
     await downloadXLSX_('escala_servico_mensal_subsegop_' + month + '.xlsx', 'Serviço Mensal', rows);
@@ -4419,6 +4609,9 @@ function renderCSummaryTable_(roster, assignments, dayTypes, month){
   rows.forEach(r=>{
     html += `<tr><td class="nome-c">${r.name}</td><td>${r.preta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
   });
+  if(rows.length){
+    html += `<tr style="font-weight:700;background:var(--card2);"><td class="nome-c">Total geral</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
+  }
   html += '</tbody>';
   table.innerHTML = html;
 }
@@ -4449,9 +4642,13 @@ document.getElementById('c-export-csv-btn').onclick = async ()=>{
   rows.push([]);
   rows.push(['Distribuição por pessoa']);
   rows.push(['Nome', 'Preta (feito/cota)', 'Vermelha (feito/cota)', 'Total']);
-  cSummaryRows_(sortByRank_(roster), assignments, dayTypes, month).forEach(r=>{
+  const cSummary = cSummaryRows_(sortByRank_(roster), assignments, dayTypes, month);
+  cSummary.forEach(r=>{
     rows.push([r.name, r.preta, r.vermelha, r.total]);
   });
+  if(cSummary.length){
+    rows.push(['Total geral', sumFeitoCota_(cSummary,'preta'), sumFeitoCota_(cSummary,'vermelha'), sumTotal_(cSummary)]);
+  }
 
   try{
     await downloadXLSX_('escala_cemaden_' + month + '.xlsx', 'CEMADEN', rows);
@@ -5314,6 +5511,9 @@ function renderENSummaryTable_(roster, assignments, dayTypes, month){
   rows.forEach(r=>{
     html += `<tr><td class="nome-c">${r.name}</td><td>${r.preta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
   });
+  if(rows.length){
+    html += `<tr style="font-weight:700;background:var(--card2);"><td class="nome-c">Total geral</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
+  }
   html += '</tbody>';
   table.innerHTML = html;
 }
@@ -5344,9 +5544,13 @@ document.getElementById('en-export-csv-btn').onclick = async ()=>{
   rows.push([]);
   rows.push(['Distribuição por pessoa']);
   rows.push(['Nome', 'Preta (feito/cota)', 'Vermelha (feito/cota)', 'Total']);
-  enSummaryRows_(sortByRank_(roster), assignments, dayTypes, month).forEach(r=>{
+  const enSummary = enSummaryRows_(sortByRank_(roster), assignments, dayTypes, month);
+  enSummary.forEach(r=>{
     rows.push([r.name, r.preta, r.vermelha, r.total]);
   });
+  if(enSummary.length){
+    rows.push(['Total geral', sumFeitoCota_(enSummary,'preta'), sumFeitoCota_(enSummary,'vermelha'), sumTotal_(enSummary)]);
+  }
 
   try{
     await downloadXLSX_('escala_elnino_' + month + '.xlsx', 'Adm Comitê El Niño', rows);
@@ -6165,6 +6369,9 @@ function renderNSummaryTable_(roster, assignments, dayTypes, month){
   rows.forEach(r=>{
     html += `<tr><td class="nome-c">${r.name}</td><td>${r.ordinario}</td><td>${r.preta}</td><td>${r.vermelha}</td><td style="font-weight:700;">${r.total}</td></tr>`;
   });
+  if(rows.length){
+    html += `<tr style="font-weight:700;background:var(--card2);"><td class="nome-c">Total geral</td><td>${sumFeitoCota_(rows,'ordinario')}</td><td>${sumFeitoCota_(rows,'preta')}</td><td>${sumFeitoCota_(rows,'vermelha')}</td><td>${sumTotal_(rows)}</td></tr>`;
+  }
   html += '</tbody>';
   table.innerHTML = html;
 }
@@ -6202,9 +6409,13 @@ document.getElementById('n-export-csv-btn').onclick = async ()=>{
   rows.push([]);
   rows.push(['Distribuição por pessoa']);
   rows.push(['Nome', 'Ordinário (feito/cota)', 'Preta (feito/cota)', 'Vermelha (feito/cota)', 'Total']);
-  nSummaryRows_(sortByRank_(roster), assignments, dayTypes, month).forEach(r=>{
+  const nSummary = nSummaryRows_(sortByRank_(roster), assignments, dayTypes, month);
+  nSummary.forEach(r=>{
     rows.push([r.name, r.ordinario, r.preta, r.vermelha, r.total]);
   });
+  if(nSummary.length){
+    rows.push(['Total geral', sumFeitoCota_(nSummary,'ordinario'), sumFeitoCota_(nSummary,'preta'), sumFeitoCota_(nSummary,'vermelha'), sumTotal_(nSummary)]);
+  }
 
   try{
     await downloadXLSX_('escala_niiad_' + month + '.xlsx', 'NIIAD', rows);
@@ -6513,6 +6724,204 @@ document.getElementById('log-clear-btn').onclick = async ()=>{
   }
   setTimeout(()=> statusEl.textContent='', 4000);
 };
+
+/* ============================================================
+   VISÃO DO DIA — quem está de serviço em cada função, num dia
+   escolhido (papel "gestor" + admin Master).
+   ============================================================ */
+let currentVisaoDiaSummary = null;
+
+function gestorAuthPassword_(){
+  // Master usa a própria senha de admin; Gestor usa a senha de gestor.
+  return currentAdminPassword || currentGestorPassword;
+}
+
+function visaoDiaLine_(names){
+  return names.length ? names.join(' e ') : '— (não preenchido)';
+}
+
+// Uma única ida ao servidor: mês + vagas das 4 funções, e os efetivos
+// (SUBSEGOP/CEMADEN/NIIAD) só pra exibir o posto junto do nome — igual já é
+// feito nas outras telas. Adm Comitê El Niño usa o mesmo efetivo do CEMADEN.
+async function getVisaoDiaBundle_(dateISO){
+  const batch = await window.storage.getBatch([
+    K_ROSTER, K_S_MONTH, K_S_ASSIGN,
+    K_C_ROSTER, K_C_MONTH, K_C_ASSIGN,
+    K_EN_MONTH, K_EN_ASSIGN,
+    K_N_ROSTER, K_N_MONTH, K_N_ASSIGN
+  ]);
+  const month = dateISO.slice(0, 7);
+  const day = String(Number(dateISO.slice(8, 10)));
+
+  function namesFor(monthKey, assignKey){
+    const savedMonth = parseBatchValue_(batch, monthKey, null);
+    if(savedMonth !== month) return [];
+    const assignments = parseBatchValue_(batch, assignKey, {});
+    const slots = assignments[day] || [];
+    // Aceita vaga em texto puro (SUBSEGOP/CEMADEN/El Niño) e em objeto
+    // {name,...} (NIIAD) — mesmo formato usado nas outras telas.
+    return slots.map(s=> (s && typeof s === 'object') ? s.name : s).filter(Boolean);
+  }
+  function withRank(names, roster){
+    return names.map(n=> displayName_(roster.find(p=> p.name === n) || {name:n}));
+  }
+
+  const sRoster = parseBatchValue_(batch, K_ROSTER, []);
+  const cRoster = parseBatchValue_(batch, K_C_ROSTER, []).map(normalizeCPerson_);
+  const nRoster = parseBatchValue_(batch, K_N_ROSTER, []);
+
+  return {
+    date: dateISO,
+    subsegop: withRank(namesFor(K_S_MONTH, K_S_ASSIGN), sRoster),
+    cemaden: withRank(namesFor(K_C_MONTH, K_C_ASSIGN), cRoster),
+    elnino: withRank(namesFor(K_EN_MONTH, K_EN_ASSIGN), cRoster),
+    niiad: withRank(namesFor(K_N_MONTH, K_N_ASSIGN), nRoster)
+  };
+}
+
+function visaoDiaSummaryText_(summary){
+  const dateLabel = swapDateLabel_(summary.date.slice(0, 7), Number(summary.date.slice(8, 10)));
+  return 'Visão do Dia — ' + dateLabel + '\n\n' +
+    'Plantão SUBSEGOP: ' + visaoDiaLine_(summary.subsegop) + '\n' +
+    'Of. Ligação CEMADEN: ' + visaoDiaLine_(summary.cemaden) + '\n' +
+    'Adm Comitê El Niño: ' + visaoDiaLine_(summary.elnino) + '\n' +
+    'NIIAD: ' + visaoDiaLine_(summary.niiad);
+}
+
+async function renderVisaoDia_(){
+  const dateISO = document.getElementById('vd-date-input').value;
+  if(!dateISO) return;
+  document.getElementById('vd-date-label').textContent = swapDateLabel_(dateISO.slice(0, 7), Number(dateISO.slice(8, 10)));
+  ['vd-subsegop','vd-cemaden','vd-elnino','vd-niiad'].forEach(id=> document.getElementById(id).textContent = 'Carregando...');
+  try{
+    const summary = await getVisaoDiaBundle_(dateISO);
+    currentVisaoDiaSummary = summary;
+    document.getElementById('vd-subsegop').textContent = visaoDiaLine_(summary.subsegop);
+    document.getElementById('vd-cemaden').textContent = visaoDiaLine_(summary.cemaden);
+    document.getElementById('vd-elnino').textContent = visaoDiaLine_(summary.elnino);
+    document.getElementById('vd-niiad').textContent = visaoDiaLine_(summary.niiad);
+  }catch(e){
+    console.error('Erro ao carregar a Visão do Dia:', e);
+    ['vd-subsegop','vd-cemaden','vd-elnino','vd-niiad'].forEach(id=> document.getElementById(id).textContent = 'Erro ao carregar.');
+  }
+}
+
+const VD_HOUR_OPTIONS_HTML_ = Array.from({length:24}, (_,h)=> `<option value="${h}">${String(h).padStart(2,'0')}:00</option>`).join('');
+
+async function loadVisaoDiaPanel(){
+  const isMasterAdmin = currentRole === 'admin' && !currentAdminSetor;
+  const isGestor = currentRole === 'gestor';
+
+  const dateInput = document.getElementById('vd-date-input');
+  if(!dateInput.value){
+    const today = new Date();
+    dateInput.value = today.getFullYear() + '-' + String(today.getMonth()+1).padStart(2,'0') + '-' + String(today.getDate()).padStart(2,'0');
+  }
+  dateInput.onchange = renderVisaoDia_;
+  document.getElementById('vd-refresh-btn').onclick = renderVisaoDia_;
+  await renderVisaoDia_();
+
+  document.getElementById('vd-copy-btn').onclick = (e)=>{
+    if(!currentVisaoDiaSummary) return;
+    copyTextToClipboard_(visaoDiaSummaryText_(currentVisaoDiaSummary), e.target, 'Copiado!');
+  };
+
+  document.getElementById('vd-send-now-btn').onclick = async ()=>{
+    const statusEl = document.getElementById('vd-send-now-status');
+    const recipients = document.getElementById('vd-send-now-emails').value.trim();
+    if(!recipients){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Informe pelo menos um e-mail.'; return; }
+    try{
+      const res = await backendSendDailyReportNow(dateInput.value, recipients, gestorAuthPassword_());
+      if(!res.ok) throw new Error(res.error || 'erro ao enviar');
+      statusEl.style.color = '#22c55e';
+      statusEl.textContent = 'E-mail enviado.';
+      logEvent('admin', isGestor ? 'Gestor' : 'Admin', 'Enviou a Visão do Dia (' + dateInput.value + ') por e-mail');
+    }catch(e){
+      statusEl.style.color = '#f87171';
+      statusEl.textContent = 'Erro ao enviar: ' + (e && e.message ? e.message : 'tente novamente.');
+    }
+    setTimeout(()=> statusEl.textContent='', 4000);
+  };
+
+  const hourSelect = document.getElementById('vd-report-hour');
+  if(!hourSelect.options.length) hourSelect.innerHTML = VD_HOUR_OPTIONS_HTML_;
+  try{
+    const cfg = await backendGetGestorReportConfig(gestorAuthPassword_());
+    if(cfg.ok){
+      document.getElementById('vd-report-emails').value = (cfg.emails || []).join(', ');
+      hourSelect.value = (cfg.hour === null || cfg.hour === undefined) ? '7' : String(cfg.hour);
+    }
+  }catch(e){ console.error('Erro ao carregar config de envio automático:', e); }
+
+  document.getElementById('vd-report-save-btn').onclick = async ()=>{
+    const statusEl = document.getElementById('vd-report-status');
+    const emails = document.getElementById('vd-report-emails').value.split(',').map(s=> s.trim()).filter(Boolean);
+    const hour = Number(hourSelect.value);
+    try{
+      const res = await backendSetGestorReportConfig(emails, hour, gestorAuthPassword_());
+      if(!res.ok) throw new Error(res.error || 'erro ao salvar');
+      statusEl.style.color = '#22c55e';
+      statusEl.textContent = emails.length ? 'Envio automático salvo.' : 'Envio automático desligado.';
+      logEvent('admin', isGestor ? 'Gestor' : 'Admin', 'Configurou envio automático da Visão do Dia (' + (emails.length ? emails.length + ' e-mail(s), ' + hour + 'h' : 'desligado') + ')');
+    }catch(e){
+      statusEl.style.color = '#f87171';
+      statusEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : 'tente novamente.');
+    }
+    setTimeout(()=> statusEl.textContent='', 4000);
+  };
+
+  // Redefinir a senha do Gestor — só o Master vê este card.
+  const masterPwCard = document.getElementById('vd-master-pw-card');
+  masterPwCard.style.display = isMasterAdmin ? 'block' : 'none';
+  if(isMasterAdmin){
+    document.getElementById('vd-master-pw-save').onclick = async ()=>{
+      const input = document.getElementById('vd-master-pw-input');
+      const msgEl = document.getElementById('vd-master-pw-msg');
+      const newPassword = input.value.trim();
+      if(!newPassword){ msgEl.style.color = '#f87171'; msgEl.textContent = 'Digite a nova senha.'; return; }
+      try{
+        const res = await backendSetGestorPassword(newPassword, currentAdminPassword);
+        if(!res.ok) throw new Error(res.error || 'erro ao salvar');
+        input.value = '';
+        msgEl.style.color = '#22c55e';
+        msgEl.textContent = 'Senha redefinida.';
+        logEvent('admin', 'Admin', 'Redefiniu a senha do Gestor');
+      }catch(e){
+        msgEl.style.color = '#f87171';
+        msgEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : 'tente novamente.');
+      }
+      setTimeout(()=> msgEl.textContent='', 4000);
+    };
+  }
+
+  // Trocar a própria senha — só visível pra quem está logado como Gestor.
+  const selfPwCard = document.getElementById('vd-self-pw-card');
+  selfPwCard.style.display = isGestor ? 'block' : 'none';
+  if(isGestor){
+    document.getElementById('vd-self-pw-save').onclick = async ()=>{
+      const oldInput = document.getElementById('vd-self-pw-old');
+      const newInput = document.getElementById('vd-self-pw-new');
+      const msgEl = document.getElementById('vd-self-pw-msg');
+      const oldPassword = oldInput.value.trim();
+      const newPassword = newInput.value.trim();
+      if(!oldPassword || !newPassword){ msgEl.style.color = '#f87171'; msgEl.textContent = 'Preencha a senha atual e a nova.'; return; }
+      try{
+        const res = await backendChangeGestorPassword(oldPassword, newPassword);
+        if(!res.ok) throw new Error(res.error === 'senha atual incorreta' ? 'senha atual incorreta' : (res.error || 'erro ao salvar'));
+        oldInput.value = ''; newInput.value = '';
+        currentGestorPassword = newPassword; // a sessão atual continua logada, agora com a nova senha
+        saveSession();
+        msgEl.style.color = '#22c55e';
+        msgEl.textContent = 'Senha alterada.';
+        logEvent('admin', 'Gestor', 'Trocou a própria senha de gestor');
+      }catch(e){
+        msgEl.style.color = '#f87171';
+        msgEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : 'tente novamente.');
+      }
+      setTimeout(()=> msgEl.textContent='', 4000);
+    };
+  }
+}
 </script>
 
 
