@@ -6785,8 +6785,8 @@ async function getVisaoDiaBundle_(dateISO){
 
 function visaoDiaSummaryText_(summary){
   const dateLabel = swapDateLabel_(summary.date.slice(0, 7), Number(summary.date.slice(8, 10)));
-  return 'Visão do Dia — ' + dateLabel + '\n\n' +
-    'Plantão SUBSEGOP: ' + visaoDiaLine_(summary.subsegop) + '\n' +
+  return 'Plantões do dia — ' + dateLabel + '\n\n' +
+    'Apoio Inst. SUBSEGOP: ' + visaoDiaLine_(summary.subsegop) + '\n' +
     'Of. Ligação CEMADEN: ' + visaoDiaLine_(summary.cemaden) + '\n' +
     'Adm Comitê El Niño: ' + visaoDiaLine_(summary.elnino) + '\n' +
     'NIIAD: ' + visaoDiaLine_(summary.niiad);
