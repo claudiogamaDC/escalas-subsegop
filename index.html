@@ -442,11 +442,13 @@
     <div class="status" id="sup-status-msg-subsegop"></div>
   </div>
   <div class="roster-card">
-    <label style="margin-top:0;">Aviso por e-mail quando uma troca de plantão for aprovada</label>
-    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão</label>
+    <label style="margin-top:0;">Aviso por e-mail de troca de plantão</label>
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão (avisado quando uma troca for aprovada)</label>
     <input type="email" id="notify-sup-email-subsegop" placeholder="supervisao@exemplo.gov.br" style="max-width:320px;">
     <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail extra (opcional)</label>
     <input type="email" id="notify-extra-email-subsegop" placeholder="outro@exemplo.gov.br" style="max-width:320px;">
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail do Admin (avisado quando uma troca ficar aguardando sua aprovação)</label>
+    <input type="email" id="notify-admin-email-subsegop" placeholder="admin@exemplo.gov.br" style="max-width:320px;">
     <button class="save-btn" id="notify-save-subsegop" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar e-mails de aviso</button>
     <div class="status" id="notify-status-msg-subsegop"></div>
   </div>
@@ -892,11 +894,13 @@
     <div class="status" id="sup-status-msg-cemaden"></div>
   </div>
   <div class="roster-card">
-    <label style="margin-top:0;">Aviso por e-mail quando uma troca de plantão for aprovada</label>
-    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão</label>
+    <label style="margin-top:0;">Aviso por e-mail de troca de plantão</label>
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão (avisado quando uma troca for aprovada)</label>
     <input type="email" id="notify-sup-email-cemaden" placeholder="supervisao@exemplo.gov.br" style="max-width:320px;">
     <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail extra (opcional)</label>
     <input type="email" id="notify-extra-email-cemaden" placeholder="outro@exemplo.gov.br" style="max-width:320px;">
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail do Admin (avisado quando uma troca ficar aguardando sua aprovação — vale pra CEMADEN e Comitê El Niño)</label>
+    <input type="email" id="notify-admin-email-cemaden" placeholder="admin@exemplo.gov.br" style="max-width:320px;">
     <button class="save-btn" id="notify-save-cemaden" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar e-mails de aviso</button>
     <div class="status" id="notify-status-msg-cemaden"></div>
   </div>
@@ -1388,11 +1392,13 @@
     <div class="status" id="sup-status-msg-niiad"></div>
   </div>
   <div class="roster-card">
-    <label style="margin-top:0;">Aviso por e-mail quando uma troca de plantão for aprovada</label>
-    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão</label>
+    <label style="margin-top:0;">Aviso por e-mail de troca de plantão</label>
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão (avisado quando uma troca for aprovada)</label>
     <input type="email" id="notify-sup-email-niiad" placeholder="supervisao@exemplo.gov.br" style="max-width:320px;">
     <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail extra (opcional)</label>
     <input type="email" id="notify-extra-email-niiad" placeholder="outro@exemplo.gov.br" style="max-width:320px;">
+    <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail do Admin (avisado quando uma troca ficar aguardando sua aprovação)</label>
+    <input type="email" id="notify-admin-email-niiad" placeholder="admin@exemplo.gov.br" style="max-width:320px;">
     <button class="save-btn" id="notify-save-niiad" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar e-mails de aviso</button>
     <div class="status" id="notify-status-msg-niiad"></div>
   </div>
@@ -1811,11 +1817,11 @@ async function backendChangeSectorAdminPassword(setor, oldPassword, newPassword)
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
 }
-async function backendSetSectorNotifyEmails(setor, supervisorEmail, extraEmail, adminPassword){
+async function backendSetSectorNotifyEmails(setor, supervisorEmail, extraEmail, adminPassword, adminEmail){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"set_sector_notify_emails", secret: BACKEND_SECRET, setor, supervisorEmail, extraEmail, adminPassword })
+    body: JSON.stringify({ action:"set_sector_notify_emails", secret: BACKEND_SECRET, setor, supervisorEmail, extraEmail, adminPassword, adminEmail })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -1885,6 +1891,23 @@ async function backendNotifySwapApproved(setor, groupLabel, month, day, fromName
     return await res.json();
   }catch(e){
     console.error('Erro ao avisar troca aprovada por e-mail:', e);
+    return { ok:false, error:String(e) };
+  }
+}
+// Disparado assim que a SEGUNDA pessoa aceita uma troca (status vira
+// "aguardando_admin") — avisa por e-mail o admin daquele setor que há uma
+// troca esperando aprovação. Best effort, mesmo padrão de
+// backendNotifySwapApproved: não trava a troca se o e-mail falhar.
+async function backendNotifySwapPendingAdmin(setor, groupLabel, month, day, fromName, toName){
+  try{
+    const res = await fetch(BACKEND_URL, {
+      method: "POST",
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ action:"notify_swap_pending_admin", secret: BACKEND_SECRET, setor, groupLabel, month, day, fromName, toName })
+    });
+    return await res.json();
+  }catch(e){
+    console.error('Erro ao avisar admin de troca pendente por e-mail:', e);
     return { ok:false, error:String(e) };
   }
 }
@@ -3253,6 +3276,7 @@ async function wireSupervisorPasswordCard_(setor){
 async function wireSectorNotifyEmailsCard_(setor){
   const supInput = document.getElementById('notify-sup-email-' + setor);
   const extraInput = document.getElementById('notify-extra-email-' + setor);
+  const adminInput = document.getElementById('notify-admin-email-' + setor);
   const saveBtn = document.getElementById('notify-save-' + setor);
   const msgEl = document.getElementById('notify-status-msg-' + setor);
   if(!saveBtn) return;
@@ -3261,13 +3285,14 @@ async function wireSectorNotifyEmailsCard_(setor){
     if(res.ok){
       supInput.value = (res.emails && res.emails.supervisorEmail) || '';
       extraInput.value = (res.emails && res.emails.extraEmail) || '';
+      adminInput.value = (res.emails && res.emails.adminEmail) || '';
     }
   }catch(e){
     console.error('Erro ao carregar e-mails de aviso:', e);
   }
   saveBtn.onclick = async ()=>{
     try{
-      const res = await backendSetSectorNotifyEmails(setor, supInput.value.trim(), extraInput.value.trim(), currentAdminPassword);
+      const res = await backendSetSectorNotifyEmails(setor, supInput.value.trim(), extraInput.value.trim(), currentAdminPassword, adminInput.value.trim());
       if(!res.ok) throw new Error(res.error || 'erro ao salvar');
       msgEl.style.color = '#22c55e';
       msgEl.textContent = 'E-mails de aviso salvos.';
@@ -3897,6 +3922,7 @@ async function sSwapRespond_(id, accept){
   req.respondedAt = new Date().toISOString();
   await setSSwaps(month, list);
   logEvent('preenchimento', currentUserName, (accept ? 'Aceitou' : 'Recusou') + ' a troca do dia ' + req.day + ' proposta por ' + req.fromName + ' (SUBSEGOP Serviço Mensal)');
+  if(accept) backendNotifySwapPendingAdmin('subsegop', 'SUBSEGOP Serviço Mensal', req.month || month, req.day, req.fromName, req.toName);
   await loadSSwapsPanel(month);
 }
 
@@ -4923,6 +4949,7 @@ async function cSwapRespond_(id, accept){
   req.respondedAt = new Date().toISOString();
   await setCSwaps(month, list);
   logEvent('preenchimento', currentUserName, (accept ? 'Aceitou' : 'Recusou') + ' a troca do dia ' + req.day + ' proposta por ' + req.fromName + ' (CEMADEN)');
+  if(accept) backendNotifySwapPendingAdmin('cemaden', 'CEMADEN', req.month || month, req.day, req.fromName, req.toName);
   await loadCSwapsPanel(month);
 }
 
@@ -5971,6 +5998,7 @@ async function enSwapRespond_(id, accept){
   req.respondedAt = new Date().toISOString();
   await setENSwaps(month, list);
   logEvent('preenchimento', currentUserName, (accept ? 'Aceitou' : 'Recusou') + ' a troca do dia ' + req.day + ' proposta por ' + req.fromName + ' (Adm Comitê El Niño)');
+  if(accept) backendNotifySwapPendingAdmin('cemaden', 'Adm Comitê El Niño', req.month || month, req.day, req.fromName, req.toName);
   await loadENSwapsPanel(month);
 }
 
@@ -6947,6 +6975,7 @@ async function nSwapRespond_(id, accept){
   req.respondedAt = new Date().toISOString();
   await setNSwaps(month, list);
   logEvent('preenchimento', currentUserName, (accept ? 'Aceitou' : 'Recusou') + ' a troca do dia ' + req.day + ' proposta por ' + req.fromName + ' (NIIAD)');
+  if(accept) backendNotifySwapPendingAdmin('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName);
   await loadNSwapsPanel(month);
 }
 
