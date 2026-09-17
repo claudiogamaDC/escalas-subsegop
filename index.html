@@ -50,12 +50,24 @@
   .tab-grp-expediente{border-left-color:#3b82f6;}
   .tab-grp-atual{border-left-color:#22c55e;}
   .tab-grp-proximo{border-left-color:#f59e0b;}
+  /* Dentro do bloco "OF LIG CEMADEN", CEMADEN e Comitê El Niño (ambos "mês
+     vigente") e as duas variantes de "próximo mês" (preenchimento x montagem
+     pelo admin) ganham cada uma sua própria cor, pra distinguir os 4
+     subgrupos de botões dentro da mesma caixa. */
+  .tab-grp-cemaden-atual{border-left-color:#22c55e;}
+  .tab-grp-elnino-atual{border-left-color:#0ea5e9;}
+  .tab-grp-proximo-fill{border-left-color:#f59e0b;}
+  .tab-grp-proximo-admin{border-left-color:#a855f7;}
   /* .tab.active define border-color (as 4 bordas) por cima — repete só a
      borda esquerda aqui, com especificidade maior, pra cor do grupo continuar
      visível mesmo na aba selecionada. */
   .tab.active.tab-grp-expediente{border-left-color:#3b82f6;}
   .tab.active.tab-grp-atual{border-left-color:#22c55e;}
   .tab.active.tab-grp-proximo{border-left-color:#f59e0b;}
+  .tab.active.tab-grp-cemaden-atual{border-left-color:#22c55e;}
+  .tab.active.tab-grp-elnino-atual{border-left-color:#0ea5e9;}
+  .tab.active.tab-grp-proximo-fill{border-left-color:#f59e0b;}
+  .tab.active.tab-grp-proximo-admin{border-left-color:#a855f7;}
   .tab-group-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
   .panel{display:none;}
   .panel.active{display:block;}
@@ -118,6 +130,22 @@
   .c-quota-vermelho-input,
   .n-quota-vermelho-input{background:#fecaca;color:#1a1a1a;border-color:#f87171;}
   .n-quota-ordinario-input{background:#bbf7d0;color:#1a1a1a;border-color:#4ade80;}
+  /* Caixas de cota nas telas de "Efetivo" (SUBSEGOP/CEMADEN/Comitê El
+     Niño/NIIAD, mês vigente e "próximo mês") — mais estreitas, pra caber
+     tudo numa linha só, e com fundo acompanhando a cor do respectivo tipo
+     de dia (preta=branco, sexta=rosa, vermelha=vermelho, ordinário=verde),
+     igual ao resto do app. */
+  .roster-row input[type=number]{padding:8px 6px;border:1px solid var(--border);border-radius:8px;font-size:13px;text-align:center;min-width:0;}
+  .roster-row .s-participant-quota-preto,
+  .roster-row .c-participant-quota-preto,
+  .roster-row .en-participant-quota-preto,
+  .roster-row .n-participant-quota-preto{background:#ffffff;color:#1a1a1a;border-color:#9ca3af;}
+  .roster-row .s-participant-quota-sexta{background:#fbcfe8;color:#1a1a1a;border-color:#f472b6;}
+  .roster-row .s-participant-quota-vermelho,
+  .roster-row .c-participant-quota-vermelho,
+  .roster-row .en-participant-quota-vermelho,
+  .roster-row .n-participant-quota-vermelho{background:#fecaca;color:#1a1a1a;border-color:#f87171;}
+  .roster-row .n-participant-quota-ordinario{background:#bbf7d0;color:#1a1a1a;border-color:#4ade80;}
   .add-row-btn{margin-top:8px;padding:8px 14px;background:var(--card2);border:1px solid var(--border);border-radius:6px;color:var(--text);cursor:pointer;font-size:13px;}
 
   .day-toggle{display:flex;align-items:center;gap:6px;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:8px 12px;cursor:pointer;user-select:none;font-size:13px;}
@@ -303,18 +331,18 @@
   <div class="tab-group">
     <div class="tab-group-label">OF LIG CEMADEN</div>
     <div class="tab-group-row">
-      <div class="tab tab-grp-atual" data-panel="fill-cemaden" data-group="cemaden">Registrar Serviço</div>
-      <div class="tab tab-grp-atual" data-panel="compiled-cemaden" data-group="cemaden">Escala Compilada</div>
-      <div class="tab tab-grp-atual" data-panel="swaps-cemaden" data-group="cemaden">Trocas de plantão</div>
-      <div class="tab tab-grp-atual" data-panel="admin-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Configurar CEMADEN</div>
-      <div class="tab tab-grp-atual" data-panel="fill-elnino" data-group="cemaden">Adm Comitê El Niño</div>
-      <div class="tab tab-grp-atual" data-panel="compiled-elnino" data-group="cemaden">Compilada — Comitê El Niño</div>
-      <div class="tab tab-grp-atual" data-panel="swaps-elnino" data-group="cemaden">Trocas — Comitê El Niño</div>
-      <div class="tab tab-grp-atual" data-panel="admin-elnino" data-admin-only="true" data-admin-only-setor="cemaden">Configurar Adm Comitê El Niño</div>
-      <div class="tab tab-grp-proximo" data-panel="fill-cemaden-next" data-group="cemaden">Registrar Serviço — próximo mês</div>
-      <div class="tab tab-grp-proximo" data-panel="admin-cemaden-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (CEMADEN)</div>
-      <div class="tab tab-grp-proximo" data-panel="fill-elnino-next" data-group="cemaden">Adm Comitê El Niño — próximo mês</div>
-      <div class="tab tab-grp-proximo" data-panel="admin-elnino-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (El Niño)</div>
+      <div class="tab tab-grp-cemaden-atual" data-panel="fill-cemaden" data-group="cemaden">Registrar Serviço</div>
+      <div class="tab tab-grp-cemaden-atual" data-panel="compiled-cemaden" data-group="cemaden">Escala Compilada</div>
+      <div class="tab tab-grp-cemaden-atual" data-panel="swaps-cemaden" data-group="cemaden">Trocas de plantão</div>
+      <div class="tab tab-grp-cemaden-atual" data-panel="admin-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Configurar CEMADEN</div>
+      <div class="tab tab-grp-elnino-atual" data-panel="fill-elnino" data-group="cemaden">Adm Comitê El Niño</div>
+      <div class="tab tab-grp-elnino-atual" data-panel="compiled-elnino" data-group="cemaden">Compilada — Comitê El Niño</div>
+      <div class="tab tab-grp-elnino-atual" data-panel="swaps-elnino" data-group="cemaden">Trocas — Comitê El Niño</div>
+      <div class="tab tab-grp-elnino-atual" data-panel="admin-elnino" data-admin-only="true" data-admin-only-setor="cemaden">Configurar Adm Comitê El Niño</div>
+      <div class="tab tab-grp-proximo-fill" data-panel="fill-cemaden-next" data-group="cemaden">Registrar Serviço — próximo mês</div>
+      <div class="tab tab-grp-proximo-admin" data-panel="admin-cemaden-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (CEMADEN)</div>
+      <div class="tab tab-grp-proximo-fill" data-panel="fill-elnino-next" data-group="cemaden">Adm Comitê El Niño — próximo mês</div>
+      <div class="tab tab-grp-proximo-admin" data-panel="admin-elnino-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (El Niño)</div>
     </div>
   </div>
 
@@ -4367,9 +4395,9 @@ async function renderSParticipantsEditor(month, wrapId, preloadedParticipants, p
         <input type="checkbox" class="s-participant-check" ${participa ? 'checked' : ''}>
       </label>
       <div style="flex:1 1 160px;font-size:13px;color:var(--text);">${displayName_(p)}</div>
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Cota preta" class="s-participant-quota-preto" style="flex:0 0 90px;" title="Cota de dias pretos">
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaSexta)||0) : 0}" placeholder="Cota sexta" class="s-participant-quota-sexta" style="flex:0 0 90px;" title="Cota de sextas (RAS)">
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Cota vermelha" class="s-participant-quota-vermelho" style="flex:0 0 100px;" title="Cota de sáb/dom (RAS)">`;
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Preta" class="s-participant-quota-preto" style="flex:0 0 62px;" title="Cota de dias pretos">
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaSexta)||0) : 0}" placeholder="Sexta" class="s-participant-quota-sexta" style="flex:0 0 62px;" title="Cota de sextas (RAS)">
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Verm." class="s-participant-quota-vermelho" style="flex:0 0 62px;" title="Cota de sáb/dom (RAS)">`;
     wrap.appendChild(row);
   });
 }
@@ -5366,8 +5394,8 @@ async function renderCParticipantsEditor(month, wrapId, preloadedParticipants, p
         <input type="checkbox" class="c-participant-check" ${participa ? 'checked' : ''}>
       </label>
       <div style="flex:1 1 160px;font-size:13px;color:var(--text);">${displayName_(p)}</div>
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Cota preta" class="c-participant-quota-preto" style="flex:0 0 90px;" title="Cota de dias pretos">
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Cota vermelha" class="c-participant-quota-vermelho" style="flex:0 0 100px;" title="Cota de dias vermelhos (RAS)">`;
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Preta" class="c-participant-quota-preto" style="flex:0 0 62px;" title="Cota de dias pretos">
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Verm." class="c-participant-quota-vermelho" style="flex:0 0 62px;" title="Cota de dias vermelhos (RAS)">`;
     wrap.appendChild(row);
   });
 }
@@ -6408,8 +6436,8 @@ async function renderENParticipantsEditor(month, wrapId, preloadedParticipants, 
         <input type="checkbox" class="en-participant-check" ${participa ? 'checked' : ''}>
       </label>
       <div style="flex:1 1 160px;font-size:13px;color:var(--text);">${displayName_(p)}</div>
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Cota preta" class="en-participant-quota-preto" style="flex:0 0 90px;" title="Cota de dias pretos">
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Cota vermelha" class="en-participant-quota-vermelho" style="flex:0 0 100px;" title="Cota de dias vermelhos (RAS)">`;
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Preta" class="en-participant-quota-preto" style="flex:0 0 62px;" title="Cota de dias pretos">
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Verm." class="en-participant-quota-vermelho" style="flex:0 0 62px;" title="Cota de dias vermelhos (RAS)">`;
     wrap.appendChild(row);
   });
 }
@@ -7430,9 +7458,9 @@ async function renderNParticipantsEditor(month, wrapId, preloadedParticipants, p
         <input type="checkbox" class="n-participant-check" ${participa ? 'checked' : ''}>
       </label>
       <div style="flex:1 1 160px;font-size:13px;color:var(--text);">${displayName_(p)}</div>
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaOrdinario)||0) : 0}" placeholder="Cota ordinário" class="n-participant-quota-ordinario" style="flex:0 0 100px;" title="Cota de serviço ordinário — soma-se às cotas preta e vermelha">
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Cota preta" class="n-participant-quota-preto" style="flex:0 0 90px;" title="Cota de dias pretos">
-      <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Cota vermelha" class="n-participant-quota-vermelho" style="flex:0 0 100px;" title="Cota de dias vermelhos (RAS)">`;
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaOrdinario)||0) : 0}" placeholder="Ordin." class="n-participant-quota-ordinario" style="flex:0 0 62px;" title="Cota de serviço ordinário — soma-se às cotas preta e vermelha">
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Preta" class="n-participant-quota-preto" style="flex:0 0 62px;" title="Cota de dias pretos">
+      <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Verm." class="n-participant-quota-vermelho" style="flex:0 0 62px;" title="Cota de dias vermelhos (RAS)">`;
     wrap.appendChild(row);
   });
 }
