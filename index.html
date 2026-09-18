@@ -370,10 +370,10 @@
     <div class="tab-group-label">SUBSEGOP</div>
     <div class="tab-group-row">
       <div class="tab tab-grp-expediente" data-panel="fill-subsegop" data-group="subsegop">Meus Expedientes</div>
-      <div class="tab tab-grp-expediente" data-panel="compiled-subsegop" data-group="subsegop">Escala Expediente</div>
+      <div class="tab tab-grp-expediente" data-panel="compiled-subsegop" data-group="subsegop" data-level-only="responsavel">Escala Expediente</div>
       <div class="tab tab-grp-expediente" data-panel="admin-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Configurar SUBSEGOP</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="fill-subsegop-serv" data-group="subsegop">Escolher Serviços</div>
-      <div class="tab tab-grp-subsegop-serv" data-panel="compiled-subsegop-serv" data-group="subsegop">Escala Compilada SUBSEGOP</div>
+      <div class="tab tab-grp-subsegop-serv" data-panel="compiled-subsegop-serv" data-group="subsegop" data-level-only="responsavel">Escala Compilada SUBSEGOP</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="swaps-subsegop-serv" data-group="subsegop">Trocas de plantão</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="admin-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar Serviço Mensal</div>
       <div class="tab tab-grp-proximo" data-panel="fill-subsegop-serv-next" data-group="subsegop">Meus serviços — próximo mês</div>
@@ -2315,7 +2315,9 @@ function applyRoleVisibility(){
       // Gestor só enxerga a Visão do Dia — nenhuma aba de setor nenhum.
       visible = gestorView;
     } else {
-      visible = !adminOnly && group && currentGroups.includes(group);
+      const levelOnly = tab.dataset.levelOnly || null;
+      visible = !adminOnly && group && currentGroups.includes(group)
+        && (!levelOnly || currentLevels[group] === levelOnly);
     }
     tab.style.display = visible ? '' : 'none';
     if(visible && !firstVisible) firstVisible = tab;
