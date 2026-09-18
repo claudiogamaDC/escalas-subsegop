@@ -48,8 +48,9 @@
      borda esquerda — ex.: "Meus serviços" e "Configurar Serviço Mensal" são
      do mesmo grupo (mês vigente), enquanto "... próximo mês"/"Montar mês
      seguinte" usam outra cor de propósito, pra não confundir os dois meses. */
-  .tab-grp-expediente{border-left-color:#3b82f6;}
+  .tab-grp-expediente{border-left-color:#22c55e;}
   .tab-grp-atual{border-left-color:#22c55e;}
+  .tab-grp-subsegop-serv{border-left-color:#3b82f6;}
   .tab-grp-proximo{border-left-color:#f59e0b;}
   /* Dentro do bloco "OF LIG CEMADEN", CEMADEN e Comitê El Niño (ambos "mês
      vigente") e as duas variantes de "próximo mês" (preenchimento x montagem
@@ -57,18 +58,19 @@
      subgrupos de botões dentro da mesma caixa. */
   .tab-grp-cemaden-atual{border-left-color:#22c55e;}
   .tab-grp-elnino-atual{border-left-color:#0ea5e9;}
-  .tab-grp-proximo-fill{border-left-color:#f59e0b;}
-  .tab-grp-proximo-admin{border-left-color:#a855f7;}
+  .tab-grp-proximo-fill{border-left-color:#a855f7;}
+  .tab-grp-proximo-admin{border-left-color:#f59e0b;}
   /* .tab.active define border-color (as 4 bordas) por cima — repete só a
      borda esquerda aqui, com especificidade maior, pra cor do grupo continuar
      visível mesmo na aba selecionada. */
-  .tab.active.tab-grp-expediente{border-left-color:#3b82f6;}
+  .tab.active.tab-grp-expediente{border-left-color:#22c55e;}
   .tab.active.tab-grp-atual{border-left-color:#22c55e;}
+  .tab.active.tab-grp-subsegop-serv{border-left-color:#3b82f6;}
   .tab.active.tab-grp-proximo{border-left-color:#f59e0b;}
   .tab.active.tab-grp-cemaden-atual{border-left-color:#22c55e;}
   .tab.active.tab-grp-elnino-atual{border-left-color:#0ea5e9;}
-  .tab.active.tab-grp-proximo-fill{border-left-color:#f59e0b;}
-  .tab.active.tab-grp-proximo-admin{border-left-color:#a855f7;}
+  .tab.active.tab-grp-proximo-fill{border-left-color:#a855f7;}
+  .tab.active.tab-grp-proximo-admin{border-left-color:#f59e0b;}
   .tab-group-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
   .panel{display:none;}
   .panel.active{display:block;}
@@ -370,10 +372,10 @@
       <div class="tab tab-grp-expediente" data-panel="fill-subsegop" data-group="subsegop">Meus expedientes</div>
       <div class="tab tab-grp-expediente" data-panel="compiled-subsegop" data-group="subsegop">Escala Expediente</div>
       <div class="tab tab-grp-expediente" data-panel="admin-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Configurar SUBSEGOP</div>
-      <div class="tab tab-grp-atual" data-panel="fill-subsegop-serv" data-group="subsegop">Meus serviços</div>
-      <div class="tab tab-grp-atual" data-panel="compiled-subsegop-serv" data-group="subsegop">Escala Serviço Mensal</div>
-      <div class="tab tab-grp-atual" data-panel="swaps-subsegop-serv" data-group="subsegop">Trocas de plantão</div>
-      <div class="tab tab-grp-atual" data-panel="admin-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar Serviço Mensal</div>
+      <div class="tab tab-grp-subsegop-serv" data-panel="fill-subsegop-serv" data-group="subsegop">Meus serviços</div>
+      <div class="tab tab-grp-subsegop-serv" data-panel="compiled-subsegop-serv" data-group="subsegop">Escala Serviço Mensal</div>
+      <div class="tab tab-grp-subsegop-serv" data-panel="swaps-subsegop-serv" data-group="subsegop">Trocas de plantão</div>
+      <div class="tab tab-grp-subsegop-serv" data-panel="admin-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar Serviço Mensal</div>
       <div class="tab tab-grp-proximo" data-panel="fill-subsegop-serv-next" data-group="subsegop">Meus serviços — próximo mês</div>
       <div class="tab tab-grp-proximo" data-panel="admin-subsegop-serv-next" data-admin-only="true" data-admin-only-setor="subsegop">Montar mês seguinte</div>
     </div>
