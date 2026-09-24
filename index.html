@@ -4034,13 +4034,13 @@ async function loadSSwapsPanel(month){
     const approved = swaps.filter(r=> r.status === 'aprovada');
     const approvedListEl = document.getElementById('s-swap-approved-list');
     approvedListEl.innerHTML = swapListHtml_(approved, 'Nenhuma troca aprovada ainda neste mês.', req =>
-      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && isCurrentMonth) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
+      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
     approvedListEl.querySelectorAll('[data-copyone]').forEach(btn=> btn.onclick = ()=>{
       const req = approved.find(r=> r.id === btn.dataset.copyone);
       if(req) copyTextToClipboard_(swapCopyLine_('SUBSEGOP Serviço Mensal', month, req), btn);
     });
     if(isAdmin){
-      approvedListEl.querySelectorAll('[data-undo]').forEach(btn=> btn.onclick = ()=> sSwapUndo_(btn.dataset.undo));
+      approvedListEl.querySelectorAll('[data-undo]').forEach(btn=> btn.onclick = ()=> sSwapUndo_(btn.dataset.undo, month));
     }
     document.getElementById('s-swap-copy-all-btn').onclick = (e)=> copyTextToClipboard_(
       approved.length ? approved.map(r=> swapCopyLine_('SUBSEGOP Serviço Mensal', month, r)).join('\n\n') : 'Nenhuma troca aprovada neste mês.',
@@ -4125,8 +4125,11 @@ async function sSwapDecide_(id, approve){
 }
 
 // Admin desiste de uma troca já aprovada: devolve a vaga pra quem tinha antes.
-async function sSwapUndo_(id){
-  const month = currentMonthISO_();
+// Recebe o mês explicitamente (vale pro vigente e pro seguinte, desde a troca
+// direta do admin) — sem isso, desfazer uma troca do mês seguinte procurava
+// (e gravava) no mês vigente por engano.
+async function sSwapUndo_(id, month){
+  month = month || currentMonthISO_();
   const list = await getSSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aprovada') { await loadSSwapsPanel(month); return; }
@@ -4148,7 +4151,8 @@ async function sSwapUndo_(id){
   await setSSwaps(month, list);
   logEvent('admin', 'Admin', 'Desfez troca (SUBSEGOP Serviço Mensal) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
   await loadSSwapsPanel(month);
-  await renderSCalendarList().catch(()=>{});
+  const isCM = month === currentMonthISO_();
+  await renderSCalendarList(null, {idPrefix: isCM ? 's' : 's-pick-next', month}).catch(()=>{});
 }
 
 // Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
@@ -5126,13 +5130,13 @@ async function loadCSwapsPanel(month){
     const approved = swaps.filter(r=> r.status === 'aprovada');
     const approvedListEl = document.getElementById('c-swap-approved-list');
     approvedListEl.innerHTML = swapListHtml_(approved, 'Nenhuma troca aprovada ainda neste mês.', req =>
-      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && isCurrentMonth) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
+      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
     approvedListEl.querySelectorAll('[data-copyone]').forEach(btn=> btn.onclick = ()=>{
       const req = approved.find(r=> r.id === btn.dataset.copyone);
       if(req) copyTextToClipboard_(swapCopyLine_('CEMADEN', month, req), btn);
     });
     if(isAdmin){
-      approvedListEl.querySelectorAll('[data-undo]').forEach(btn=> btn.onclick = ()=> cSwapUndo_(btn.dataset.undo));
+      approvedListEl.querySelectorAll('[data-undo]').forEach(btn=> btn.onclick = ()=> cSwapUndo_(btn.dataset.undo, month));
     }
     document.getElementById('c-swap-copy-all-btn').onclick = (e)=> copyTextToClipboard_(
       approved.length ? approved.map(r=> swapCopyLine_('CEMADEN', month, r)).join('\n\n') : 'Nenhuma troca aprovada neste mês.',
@@ -5202,8 +5206,8 @@ async function cSwapDecide_(id, approve){
   await renderCCalendarList().catch(()=>{});
 }
 
-async function cSwapUndo_(id){
-  const month = currentMonthISO_();
+async function cSwapUndo_(id, month){
+  month = month || currentMonthISO_();
   const list = await getCSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aprovada') { await loadCSwapsPanel(month); return; }
@@ -5225,7 +5229,8 @@ async function cSwapUndo_(id){
   await setCSwaps(month, list);
   logEvent('admin', 'Admin', 'Desfez troca (CEMADEN) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
   await loadCSwapsPanel(month);
-  await renderCCalendarList().catch(()=>{});
+  const isCM = month === currentMonthISO_();
+  await renderCCalendarList(null, {idPrefix: isCM ? 'c' : 'c-pick-next', month}).catch(()=>{});
 }
 
 // Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
@@ -6226,13 +6231,13 @@ async function loadENSwapsPanel(month){
     const approved = swaps.filter(r=> r.status === 'aprovada');
     const approvedListEl = document.getElementById('en-swap-approved-list');
     approvedListEl.innerHTML = swapListHtml_(approved, 'Nenhuma troca aprovada ainda neste mês.', req =>
-      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && isCurrentMonth) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
+      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
     approvedListEl.querySelectorAll('[data-copyone]').forEach(btn=> btn.onclick = ()=>{
       const req = approved.find(r=> r.id === btn.dataset.copyone);
       if(req) copyTextToClipboard_(swapCopyLine_('Adm Comitê El Niño', month, req), btn);
     });
     if(isAdmin){
-      approvedListEl.querySelectorAll('[data-undo]').forEach(btn=> btn.onclick = ()=> enSwapUndo_(btn.dataset.undo));
+      approvedListEl.querySelectorAll('[data-undo]').forEach(btn=> btn.onclick = ()=> enSwapUndo_(btn.dataset.undo, month));
     }
     document.getElementById('en-swap-copy-all-btn').onclick = (e)=> copyTextToClipboard_(
       approved.length ? approved.map(r=> swapCopyLine_('Adm Comitê El Niño', month, r)).join('\n\n') : 'Nenhuma troca aprovada neste mês.',
@@ -6302,8 +6307,8 @@ async function enSwapDecide_(id, approve){
   await renderENCalendarList().catch(()=>{});
 }
 
-async function enSwapUndo_(id){
-  const month = currentMonthISO_();
+async function enSwapUndo_(id, month){
+  month = month || currentMonthISO_();
   const list = await getENSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aprovada') { await loadENSwapsPanel(month); return; }
@@ -6325,7 +6330,8 @@ async function enSwapUndo_(id){
   await setENSwaps(month, list);
   logEvent('admin', 'Admin', 'Desfez troca (Adm Comitê El Niño) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
   await loadENSwapsPanel(month);
-  await renderENCalendarList().catch(()=>{});
+  const isCM = month === currentMonthISO_();
+  await renderENCalendarList(null, {idPrefix: isCM ? 'en' : 'en-pick-next', month}).catch(()=>{});
 }
 
 // Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
@@ -7243,13 +7249,13 @@ async function loadNSwapsPanel(month){
     const approved = swaps.filter(r=> r.status === 'aprovada');
     const approvedListEl = document.getElementById('n-swap-approved-list');
     approvedListEl.innerHTML = swapListHtml_(approved, 'Nenhuma troca aprovada ainda neste mês.', req =>
-      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && isCurrentMonth) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
+      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
     approvedListEl.querySelectorAll('[data-copyone]').forEach(btn=> btn.onclick = ()=>{
       const req = approved.find(r=> r.id === btn.dataset.copyone);
       if(req) copyTextToClipboard_(swapCopyLine_('NIIAD', month, req), btn);
     });
     if(isAdmin){
-      approvedListEl.querySelectorAll('[data-undo]').forEach(btn=> btn.onclick = ()=> nSwapUndo_(btn.dataset.undo));
+      approvedListEl.querySelectorAll('[data-undo]').forEach(btn=> btn.onclick = ()=> nSwapUndo_(btn.dataset.undo, month));
     }
     document.getElementById('n-swap-copy-all-btn').onclick = (e)=> copyTextToClipboard_(
       approved.length ? approved.map(r=> swapCopyLine_('NIIAD', month, r)).join('\n\n') : 'Nenhuma troca aprovada neste mês.',
@@ -7287,6 +7293,23 @@ async function nSwapRespond_(id, accept){
   await loadNSwapsPanel(month);
 }
 
+// NIIAD: pergunta SEMPRE como a vaga vai contar pra quem entra, em toda
+// troca (aprovação normal e troca direta do admin) — Ordinário só é
+// oferecido como opção em dia preto (regra de cota: nunca conta em dia
+// vermelho), mas em dia vermelho ainda assim pede confirmação explícita em
+// vez de aplicar direto sem perguntar nada. Retorna {isOrd} ou null se quem
+// decidiu desistiu (nesse caso nada foi alterado ainda).
+async function nAskSwapType_(day, toName, dayType){
+  if(dayType === 'preto'){
+    const choice = await askChoice_('A vaga do dia ' + day + ' passa a contar como o quê pra ' + toName + '?', 'Ordinário', 'Preto (RAS)');
+    if(choice === null) return null;
+    return { isOrd: choice === 'a' };
+  }
+  const confirmed = await askConfirm('Dia vermelho: a vaga do dia ' + day + ' só pode contar como RAS pra ' + toName + '. Confirmar a troca?');
+  if(!confirmed) return null;
+  return { isOrd: false };
+}
+
 async function nSwapDecide_(id, approve){
   const month = currentMonthISO_();
   const list = await getNSwaps(month);
@@ -7310,14 +7333,9 @@ async function nSwapDecide_(id, approve){
       const norm = nNormalizeSlot_(slots[idx]);
       const dayTypes = await getNDayTypes(month);
       const dayType = nDayType(dayTypes, month, Number(req.day));
-      // Cota de Ordinário só existe pra dia preto — dia vermelho nunca é
-      // Ordinário, então nem perguntamos, já aprova direto como Vermelho (RAS).
-      let isOrd = false;
-      if(dayType === 'preto'){
-        const choice = await askChoice_('A vaga do dia ' + req.day + ' passa a contar como o quê pra ' + req.toName + '?', 'Ordinário', 'Preto (RAS)');
-        if(choice === null) return; // aprovador desistiu — pedido continua aguardando decisão
-        isOrd = choice === 'a';
-      }
+      const decision = await nAskSwapType_(req.day, req.toName, dayType);
+      if(decision === null) return; // aprovador desistiu — pedido continua aguardando decisão
+      const isOrd = decision.isOrd;
       slots[idx] = { name: req.toName, ord: isOrd };
       assignments[req.day] = slots;
       await setNAssignments(month, assignments);
@@ -7338,8 +7356,8 @@ async function nSwapDecide_(id, approve){
   await renderNCalendarList().catch(()=>{});
 }
 
-async function nSwapUndo_(id){
-  const month = currentMonthISO_();
+async function nSwapUndo_(id, month){
+  month = month || currentMonthISO_();
   const list = await getNSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aprovada') { await loadNSwapsPanel(month); return; }
@@ -7366,7 +7384,8 @@ async function nSwapUndo_(id){
   await setNSwaps(month, list);
   logEvent('admin', 'Admin', 'Desfez troca (NIIAD) — dia ' + req.day + ': ' + before + ' → ' + nSlotNames_(slots).join(', '));
   await loadNSwapsPanel(month);
-  await renderNCalendarList().catch(()=>{});
+  const isCM = month === currentMonthISO_();
+  await renderNCalendarList(null, {idPrefix: isCM ? 'n' : 'n-pick-next', month}).catch(()=>{});
 }
 
 // Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
@@ -7394,12 +7413,9 @@ async function nSwapAdminDirect_(month){
   const norm = nNormalizeSlot_(slots[idx]);
   const dayTypes = await getNDayTypes(month);
   const dayType = nDayType(dayTypes, month, Number(day));
-  let isOrd = false;
-  if(dayType === 'preto'){
-    const choice = await askChoice_('A vaga do dia ' + day + ' passa a contar como o quê pra ' + toName + '?', 'Ordinário', 'Preto (RAS)');
-    if(choice === null) return; // admin desistiu — nada foi alterado ainda
-    isOrd = choice === 'a';
-  }
+  const decision = await nAskSwapType_(day, toName, dayType);
+  if(decision === null) return; // admin desistiu — nada foi alterado ainda
+  const isOrd = decision.isOrd;
   const before = nSlotNames_(slots).join(', ');
   slots[idx] = { name: toName, ord: isOrd };
   assignments[day] = slots;
