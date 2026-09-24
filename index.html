@@ -2229,10 +2229,15 @@ function swapDateLabel_(month, day){
 // Texto pronto pra colar no WhatsApp com o registro de uma troca aprovada.
 // O tipo (ORD/RAS) só existe no NIIAD — SUBSEGOP e CEMADEN não distinguem
 // tipo de serviço, então req.typeLabel fica vazio nesses dois e some do texto.
+// Quem sai e quem entra podem ficar com marcações diferentes (req.fromOrd é
+// a que a vaga tinha ANTES da troca, req.typeLabel é a que passa a valer pra
+// quem entra) — mostrar os dois com o mesmo rótulo dava a entender errado
+// que a marcação de quem saiu não tinha mudado.
 function swapCopyLine_(groupLabel, month, req){
   const dateLabel = swapDateLabel_(month, req.day);
-  const suffix = req.typeLabel ? ` (${req.typeLabel})` : '';
-  return `*${groupLabel}* — ${dateLabel}\nSai: ${req.fromName}${suffix}\nEntra: ${req.toName}${suffix}`;
+  const fromSuffix = req.typeLabel ? ` (${req.fromOrd ? 'ORD' : 'RAS'})` : '';
+  const toSuffix = req.typeLabel ? ` (${req.typeLabel})` : '';
+  return `*${groupLabel}* — ${dateLabel}\nSai: ${req.fromName}${fromSuffix}\nEntra: ${req.toName}${toSuffix}`;
 }
 async function copyTextToClipboard_(text, btn, doneLabel){
   let copied = false;
