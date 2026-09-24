@@ -7057,10 +7057,14 @@ async function nSwapDecide_(id, approve){
       const norm = nNormalizeSlot_(slots[idx]);
       const dayTypes = await getNDayTypes(month);
       const dayType = nDayType(dayTypes, month, Number(req.day));
-      const tipoLabel = dayType === 'preto' ? 'Preto (RAS)' : (dayType === 'vermelho' ? 'Vermelho (RAS)' : 'RAS');
-      const choice = await askChoice_('A vaga do dia ' + req.day + ' passa a contar como o quê pra ' + req.toName + '?', 'Ordinário', tipoLabel);
-      if(choice === null) return; // aprovador desistiu — pedido continua aguardando decisão
-      const isOrd = choice === 'a';
+      // Cota de Ordinário só existe pra dia preto — dia vermelho nunca é
+      // Ordinário, então nem perguntamos, já aprova direto como Vermelho (RAS).
+      let isOrd = false;
+      if(dayType === 'preto'){
+        const choice = await askChoice_('A vaga do dia ' + req.day + ' passa a contar como o quê pra ' + req.toName + '?', 'Ordinário', 'Preto (RAS)');
+        if(choice === null) return; // aprovador desistiu — pedido continua aguardando decisão
+        isOrd = choice === 'a';
+      }
       slots[idx] = { name: req.toName, ord: isOrd };
       assignments[req.day] = slots;
       await setNAssignments(month, assignments);
@@ -7197,7 +7201,8 @@ async function renderNCalendarList(preloadedBundle, opts){
 
   // Alguém pode assumir a vaga se, além das checagens de vez/consecutivo/lotação,
   // ainda tiver espaço na cota de Ordinário OU na cota do tipo do dia (a pessoa
-  // escolhe qual das duas ao clicar "Assumir").
+  // escolhe qual das duas ao clicar "Assumir"). Cota de Ordinário só vale pra
+  // dia preto — dia vermelho nunca pode contar como Ordinário.
   function canPick(name, day, slots, type){
     if(!name) return false;
     if(!released && !isAdmin) return false;
@@ -7211,7 +7216,7 @@ async function renderNCalendarList(preloadedBundle, opts){
     const entry = roster.find(p=> p.name === name);
     if(entry){
       const c = nCountsFor_(name, assignments, dayTypes, month);
-      const roomOrd = c.ordinario < (Number(entry.quotaOrdinario)||0);
+      const roomOrd = type === 'preto' && c.ordinario < (Number(entry.quotaOrdinario)||0);
       const roomTipo = (type === 'preto' ? c.preto : c.vermelho) < (type === 'preto' ? (Number(entry.quotaPreto)||0) : (Number(entry.quotaVermelho)||0));
       if(!roomOrd && !roomTipo) return false;
     }
@@ -7253,10 +7258,14 @@ async function renderNCalendarList(preloadedBundle, opts){
       const name = isAdmin ? document.getElementById(id('admin-target-select')).value : myName;
       if(!name){ alert('Selecione a pessoa antes de assumir.'); return; }
       const dayType = nDayType(dayTypes, month, Number(day));
-      const tipoLabel = dayType === 'preto' ? 'Preto (RAS)' : 'Vermelho (RAS)';
-      const choice = await askChoice_('A vaga do dia ' + day + ' conta como o quê pra ' + displayName_(roster.find(p=>p.name===name)||{name}) + '?', 'Ordinário', tipoLabel);
-      if(!choice) return;
-      const isOrd = choice === 'a';
+      // Cota de Ordinário só existe pra dia preto — dia vermelho nunca é
+      // Ordinário, então nem perguntamos, já assume direto como Vermelho (RAS).
+      let isOrd = false;
+      if(dayType === 'preto'){
+        const choice = await askChoice_('A vaga do dia ' + day + ' conta como o quê pra ' + displayName_(roster.find(p=>p.name===name)||{name}) + '?', 'Ordinário', 'Preto (RAS)');
+        if(!choice) return;
+        isOrd = choice === 'a';
+      }
       // Uma única leitura fresca (liberação + atribuições), reaproveitada
       // tanto pra validar quanto pra gravar.
       const freshBatch = await window.storage.getBatch([monthKey_(K_N_RELEASED, month), monthKey_(K_N_ASSIGN, month)]);
@@ -7339,6 +7348,12 @@ function validateNPick_(targetName, day, isOrd, ctx){
   const nextNames = nSlotNames_(assignments[String(dayNum+1)] || []);
   if(prevNames.includes(targetName) || nextNames.includes(targetName)){
     return {ok:false, error:'Não é permitido assumir dias consecutivos.'};
+  }
+
+  // Cota de Ordinário só existe pra dia preto — dia vermelho nunca pode ser
+  // marcado como Ordinário, mesmo que isOrd chegue true por estado obsoleto.
+  if(isOrd && nDayType(dayTypes, month, dayNum) === 'vermelho'){
+    return {ok:false, error:'Dia vermelho não pode ser contado como Ordinário.'};
   }
 
   const entry = roster.find(p=> p.name === targetName);
