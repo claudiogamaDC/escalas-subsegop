@@ -4227,7 +4227,7 @@ async function renderSCalendarList(preloadedBundle, opts){
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + ' (SUBSEGOP Serviço Mensal)');
       // Redesenha com os dados que acabamos de gravar, sem buscar tudo de
       // novo do servidor (roster/dayTypes/skipped não mudam num clique).
-      await renderSCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments}, opts);
+      await renderSCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments, configured: true}, opts);
     };
   });
 
@@ -4258,7 +4258,7 @@ async function renderSCalendarList(preloadedBundle, opts){
       freshAssignments[day] = freshSlots;
       await setSAssignments(month, freshAssignments);
       logEvent('preenchimento', currentUserName || removedName, 'Removeu o dia ' + day + ' de ' + removedName + ' (SUBSEGOP Serviço Mensal)');
-      await renderSCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments}, opts);
+      await renderSCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments, configured: true}, opts);
     };
   });
 }
@@ -5239,7 +5239,7 @@ async function renderCCalendarList(preloadedBundle, opts){
       freshAssignments[day] = freshSlots;
       await setCAssignments(month, freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + ' (CEMADEN)');
-      await renderCCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments}, opts);
+      await renderCCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments, configured: true}, opts);
     };
   });
 
@@ -5270,7 +5270,7 @@ async function renderCCalendarList(preloadedBundle, opts){
       freshAssignments[day] = freshSlots;
       await setCAssignments(month, freshAssignments);
       logEvent('preenchimento', currentUserName || removedName, 'Removeu o dia ' + day + ' de ' + removedName + ' (CEMADEN)');
-      await renderCCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments}, opts);
+      await renderCCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments, configured: true}, opts);
     };
   });
 }
@@ -6288,7 +6288,7 @@ async function renderENCalendarList(preloadedBundle, opts){
       freshAssignments[day] = freshSlots;
       await setENAssignments(month, freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + ' (Adm Comitê El Niño)');
-      await renderENCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments}, opts);
+      await renderENCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments, configured: true}, opts);
     };
   });
 
@@ -6319,7 +6319,7 @@ async function renderENCalendarList(preloadedBundle, opts){
       freshAssignments[day] = freshSlots;
       await setENAssignments(month, freshAssignments);
       logEvent('preenchimento', currentUserName || removedName, 'Removeu o dia ' + day + ' de ' + removedName + ' (Adm Comitê El Niño)');
-      await renderENCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments}, opts);
+      await renderENCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments, configured: true}, opts);
     };
   });
 }
@@ -7286,7 +7286,7 @@ async function renderNCalendarList(preloadedBundle, opts){
       freshAssignments[day] = freshSlots;
       await setNAssignments(month, freshAssignments);
       logEvent('preenchimento', currentUserName || name, 'Assumiu o dia ' + day + ' como ' + name + (isOrd ? ' (Ordinário)' : ' (' + dayType + ')') + ' (NIIAD)');
-      await renderNCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments}, opts);
+      await renderNCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments, configured: true}, opts);
     };
   });
 
@@ -7317,7 +7317,7 @@ async function renderNCalendarList(preloadedBundle, opts){
       freshAssignments[day] = freshSlots;
       await setNAssignments(month, freshAssignments);
       logEvent('preenchimento', currentUserName || (removedSlot && removedSlot.name), 'Removeu o dia ' + day + ' de ' + (removedSlot && removedSlot.name) + ' (NIIAD)');
-      await renderNCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments}, opts);
+      await renderNCalendarList({roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments, configured: true}, opts);
     };
   });
 }
