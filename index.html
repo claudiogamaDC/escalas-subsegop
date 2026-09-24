@@ -7294,20 +7294,18 @@ async function nSwapRespond_(id, accept){
 }
 
 // NIIAD: pergunta SEMPRE como a vaga vai contar pra quem entra, em toda
-// troca (aprovação normal e troca direta do admin) — Ordinário só é
-// oferecido como opção em dia preto (regra de cota: nunca conta em dia
-// vermelho), mas em dia vermelho ainda assim pede confirmação explícita em
-// vez de aplicar direto sem perguntar nada. Retorna {isOrd} ou null se quem
-// decidiu desistiu (nesse caso nada foi alterado ainda).
+// troca (aprovação normal e troca direta do admin) — inclusive em dia
+// vermelho, onde a cota de Ordinário normalmente não vale (regra do
+// "Assumir vaga" avulso). Numa permuta autorizada pelo admin isso pode fazer
+// sentido de propósito (ex.: compensar um Ordinário de outro dia que fez
+// parte do acordo entre as duas pessoas) — por isso aqui o admin tem
+// liberdade pra decidir, mesmo sobrepondo essa distribuição. Retorna {isOrd}
+// ou null se quem decidiu desistiu (nesse caso nada foi alterado ainda).
 async function nAskSwapType_(day, toName, dayType){
-  if(dayType === 'preto'){
-    const choice = await askChoice_('A vaga do dia ' + day + ' passa a contar como o quê pra ' + toName + '?', 'Ordinário', 'Preto (RAS)');
-    if(choice === null) return null;
-    return { isOrd: choice === 'a' };
-  }
-  const confirmed = await askConfirm('Dia vermelho: a vaga do dia ' + day + ' só pode contar como RAS pra ' + toName + '. Confirmar a troca?');
-  if(!confirmed) return null;
-  return { isOrd: false };
+  const rasLabel = dayType === 'vermelho' ? 'Vermelho (RAS)' : 'Preto (RAS)';
+  const choice = await askChoice_('A vaga do dia ' + day + ' passa a contar como o quê pra ' + toName + '?', 'Ordinário', rasLabel);
+  if(choice === null) return null;
+  return { isOrd: choice === 'a' };
 }
 
 async function nSwapDecide_(id, approve){
