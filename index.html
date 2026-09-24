@@ -693,6 +693,17 @@
     <div id="s-swap-mine-list" style="padding:12px;"></div>
   </div>
 
+  <div class="roster-card" id="s-swap-admin-direct-card" style="display:none;">
+    <label style="margin-top:0;">Admin: aplicar troca diretamente (sem aguardar aceite)</label>
+    <select id="s-swap-admin-day-select"></select>
+    <label>Sai (quem está no dia)</label>
+    <select id="s-swap-admin-from-select"></select>
+    <label>Entra</label>
+    <select id="s-swap-admin-to-select"></select>
+    <button class="save-btn" id="s-swap-admin-direct-btn">Aplicar troca agora</button>
+    <div class="status" id="s-swap-admin-direct-status"></div>
+  </div>
+
   <div class="schedule-wrap" id="s-swap-admin-wrap" style="margin-top:16px;display:none;">
     <div class="schedule-title">AGUARDANDO APROVAÇÃO DO ADMIN</div>
     <div id="s-swap-admin-status" style="padding:10px 12px 0;font-size:12px;"></div>
@@ -919,6 +930,17 @@
   <div class="schedule-wrap" id="c-swap-mine-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="c-swap-mine-list" style="padding:12px;"></div>
+  </div>
+
+  <div class="roster-card" id="c-swap-admin-direct-card" style="display:none;">
+    <label style="margin-top:0;">Admin: aplicar troca diretamente (sem aguardar aceite)</label>
+    <select id="c-swap-admin-day-select"></select>
+    <label>Sai (quem está no dia)</label>
+    <select id="c-swap-admin-from-select"></select>
+    <label>Entra</label>
+    <select id="c-swap-admin-to-select"></select>
+    <button class="save-btn" id="c-swap-admin-direct-btn">Aplicar troca agora</button>
+    <div class="status" id="c-swap-admin-direct-status"></div>
   </div>
 
   <div class="schedule-wrap" id="c-swap-admin-wrap" style="margin-top:16px;display:none;">
@@ -1192,6 +1214,17 @@
     <div id="en-swap-mine-list" style="padding:12px;"></div>
   </div>
 
+  <div class="roster-card" id="en-swap-admin-direct-card" style="display:none;">
+    <label style="margin-top:0;">Admin: aplicar troca diretamente (sem aguardar aceite)</label>
+    <select id="en-swap-admin-day-select"></select>
+    <label>Sai (quem está no dia)</label>
+    <select id="en-swap-admin-from-select"></select>
+    <label>Entra</label>
+    <select id="en-swap-admin-to-select"></select>
+    <button class="save-btn" id="en-swap-admin-direct-btn">Aplicar troca agora</button>
+    <div class="status" id="en-swap-admin-direct-status"></div>
+  </div>
+
   <div class="schedule-wrap" id="en-swap-admin-wrap" style="margin-top:16px;display:none;">
     <div class="schedule-title">AGUARDANDO APROVAÇÃO DO ADMIN</div>
     <div id="en-swap-admin-status" style="padding:10px 12px 0;font-size:12px;"></div>
@@ -1417,6 +1450,17 @@
   <div class="schedule-wrap" id="n-swap-mine-wrap" style="margin-top:16px;">
     <div class="schedule-title">MINHAS PROPOSTAS</div>
     <div id="n-swap-mine-list" style="padding:12px;"></div>
+  </div>
+
+  <div class="roster-card" id="n-swap-admin-direct-card" style="display:none;">
+    <label style="margin-top:0;">Admin: aplicar troca diretamente (sem aguardar aceite)</label>
+    <select id="n-swap-admin-day-select"></select>
+    <label>Sai (quem está no dia)</label>
+    <select id="n-swap-admin-from-select"></select>
+    <label>Entra</label>
+    <select id="n-swap-admin-to-select"></select>
+    <button class="save-btn" id="n-swap-admin-direct-btn">Aplicar troca agora</button>
+    <div class="status" id="n-swap-admin-direct-status"></div>
   </div>
 
   <div class="schedule-wrap" id="n-swap-admin-wrap" style="margin-top:16px;display:none;">
@@ -2003,6 +2047,14 @@ function logEvent(type, actor, details){
     body: JSON.stringify({ action:"log_event", secret: BACKEND_SECRET, type, actor: actor || '—', details: details || '' })
   }).catch(()=>{});
 }
+// Identifica no histórico se quem agiu foi o Admin Master (acesso total) ou
+// um Admin de setor — usado nas ações de troca direta (item novo), onde essa
+// distinção importa pra auditoria. Não mexe nos logs de admin já existentes.
+function adminActorLabel_(){
+  if(!currentAdminSetor) return 'Admin Master';
+  const groupLabels = { subsegop:'SUBSEGOP', cemaden:'Of. Lig. CEMADEN', niiad:'NIIAD' };
+  return 'Admin (setor ' + (groupLabels[currentAdminSetor] || currentAdminSetor) + ')';
+}
 
 /* ---- Diff helpers (item 7: log com "antes → depois") ---- */
 function diffRoster_(before, after){
@@ -2114,6 +2166,40 @@ function renderSwapHistory_(elId, swaps){
 function swapListHtml_(list, emptyMsg, buttonsFor){
   if(!list.length) return `<p style="color:#64748b;font-size:13px;margin:0;">${emptyMsg}</p>`;
   return list.slice().reverse().map(req=> swapRowHtml_(req, buttonsFor ? buttonsFor(req) : '')).join('');
+}
+// Card "Admin: aplicar troca diretamente" (item novo — admin propõe E
+// autoriza numa ação só, sem esperar quem sai/quem entra aceitar). Genérico
+// pros 4 grupos: cada um só passa sua função XSlotNames_ (todos têm essa
+// mesma assinatura: slots do dia → array de nomes ocupando vaga).
+function populateSwapAdminDirect_(prefix, roster, assignments, month, slotNamesFn){
+  const total = daysInMonth(month);
+  const daySelect = document.getElementById(prefix + '-swap-admin-day-select');
+  const fromSelect = document.getElementById(prefix + '-swap-admin-from-select');
+  const toSelect = document.getElementById(prefix + '-swap-admin-to-select');
+  const dayOptions = [];
+  for(let day=1; day<=total; day++){
+    const names = slotNamesFn(assignments[String(day)] || []);
+    if(names.length) dayOptions.push({day, names});
+  }
+  daySelect.innerHTML = dayOptions.length
+    ? dayOptions.map(o=> `<option value="${o.day}">Dia ${String(o.day).padStart(2,'0')} — ${o.names.join(', ')}</option>`).join('')
+    : '<option value="">-- nenhum dia preenchido ainda --</option>';
+  const refreshFrom = ()=>{
+    const day = daySelect.value;
+    const names = slotNamesFn(assignments[String(day)] || []);
+    fromSelect.innerHTML = names.length
+      ? names.map(n=>{ const p = roster.find(r=> r.name === n); return `<option value="${n}">${displayName_(p || {name:n})}</option>`; }).join('')
+      : '<option value="">--</option>';
+    refreshTo();
+  };
+  const refreshTo = ()=>{
+    const day = daySelect.value;
+    const occ = slotNamesFn(assignments[String(day)] || []);
+    toSelect.innerHTML = '<option value="">-- selecione --</option>' +
+      sortByRank_(roster).filter(p=> !occ.includes(p.name)).map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
+  };
+  daySelect.onchange = refreshFrom;
+  refreshFrom();
 }
 // Pra colorir a escala compilada: dia → Set com os nomes que ocuparam a vaga
 // naquele dia via troca aprovada (item 2 do feedback).
@@ -3921,6 +4007,15 @@ async function loadSSwapsPanel(month){
     if(req) copyTextToClipboard_(swapCopyLine_('SUBSEGOP Serviço Mensal', month, req), btn);
   });
 
+  const directCard = document.getElementById('s-swap-admin-direct-card');
+  if(isAdmin && isCurrentMonth){
+    directCard.style.display = 'block';
+    populateSwapAdminDirect_('s', roster, assignments, month, sSlotNames_);
+    document.getElementById('s-swap-admin-direct-btn').onclick = sSwapAdminDirect_;
+  } else {
+    directCard.style.display = 'none';
+  }
+
   const adminWrap = document.getElementById('s-swap-admin-wrap');
   if(isAdmin || isSupervisor){
     adminWrap.style.display = 'block';
@@ -4048,6 +4143,43 @@ async function sSwapUndo_(id){
   req.undoneAt = new Date().toISOString();
   await setSSwaps(month, list);
   logEvent('admin', 'Admin', 'Desfez troca (SUBSEGOP Serviço Mensal) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
+  await loadSSwapsPanel(month);
+  await renderSCalendarList().catch(()=>{});
+}
+
+// Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
+// quem sai/quem entra aceitar — fica registrada como aprovada de cara, com
+// o autor identificado (Admin Master ou Admin do setor) pra auditoria.
+async function sSwapAdminDirect_(){
+  const month = currentMonthISO_();
+  const day = document.getElementById('s-swap-admin-day-select').value;
+  const fromName = document.getElementById('s-swap-admin-from-select').value;
+  const toName = document.getElementById('s-swap-admin-to-select').value;
+  const statusEl = document.getElementById('s-swap-admin-direct-status');
+  if(!day || !fromName || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia, quem sai e quem entra.'; return; }
+  if(fromName === toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha pessoas diferentes.'; return; }
+  const assignments = await getSAssignments(month);
+  const slots = (assignments[day] || []).slice();
+  const idx = slots.indexOf(fromName);
+  if(idx === -1 || slots.includes(toName)){
+    statusEl.style.color = '#f87171';
+    statusEl.textContent = 'Essa vaga mudou desde que a tela carregou. Atualizando...';
+    await loadSSwapsPanel(month);
+    return;
+  }
+  const before = slots.slice();
+  slots[idx] = toName;
+  assignments[day] = slots;
+  await setSAssignments(month, assignments);
+  const nowIso = new Date().toISOString();
+  const req = { id: newSwapId_(), day, fromName, toName, status: 'aprovada', createdAt: nowIso, respondedAt: nowIso, decidedAt: nowIso, month, appliedDirectlyByAdmin: true };
+  const swaps = await getSSwaps(month);
+  swaps.push(req);
+  await setSSwaps(month, swaps);
+  logEvent('admin', adminActorLabel_(), 'Aplicou troca direta (SUBSEGOP Serviço Mensal) — dia ' + day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
+  backendNotifySwapApproved('subsegop', 'SUBSEGOP Serviço Mensal', month, day, fromName, toName);
+  statusEl.style.color = '#22c55e';
+  statusEl.textContent = 'Troca aplicada com sucesso.';
   await loadSSwapsPanel(month);
   await renderSCalendarList().catch(()=>{});
 }
@@ -4962,6 +5094,15 @@ async function loadCSwapsPanel(month){
     if(req) copyTextToClipboard_(swapCopyLine_('CEMADEN', month, req), btn);
   });
 
+  const directCard = document.getElementById('c-swap-admin-direct-card');
+  if(isAdmin && isCurrentMonth){
+    directCard.style.display = 'block';
+    populateSwapAdminDirect_('c', roster, assignments, month, cSlotNames_);
+    document.getElementById('c-swap-admin-direct-btn').onclick = cSwapAdminDirect_;
+  } else {
+    directCard.style.display = 'none';
+  }
+
   const adminWrap = document.getElementById('c-swap-admin-wrap');
   if(isAdmin || isSupervisor){
     adminWrap.style.display = 'block';
@@ -5074,6 +5215,43 @@ async function cSwapUndo_(id){
   req.undoneAt = new Date().toISOString();
   await setCSwaps(month, list);
   logEvent('admin', 'Admin', 'Desfez troca (CEMADEN) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
+  await loadCSwapsPanel(month);
+  await renderCCalendarList().catch(()=>{});
+}
+
+// Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
+// quem sai/quem entra aceitar — fica registrada como aprovada de cara, com
+// o autor identificado (Admin Master ou Admin do setor) pra auditoria.
+async function cSwapAdminDirect_(){
+  const month = currentMonthISO_();
+  const day = document.getElementById('c-swap-admin-day-select').value;
+  const fromName = document.getElementById('c-swap-admin-from-select').value;
+  const toName = document.getElementById('c-swap-admin-to-select').value;
+  const statusEl = document.getElementById('c-swap-admin-direct-status');
+  if(!day || !fromName || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia, quem sai e quem entra.'; return; }
+  if(fromName === toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha pessoas diferentes.'; return; }
+  const assignments = await getCAssignments(month);
+  const slots = (assignments[day] || []).slice();
+  const idx = slots.indexOf(fromName);
+  if(idx === -1 || slots.includes(toName)){
+    statusEl.style.color = '#f87171';
+    statusEl.textContent = 'Essa vaga mudou desde que a tela carregou. Atualizando...';
+    await loadCSwapsPanel(month);
+    return;
+  }
+  const before = slots.slice();
+  slots[idx] = toName;
+  assignments[day] = slots;
+  await setCAssignments(month, assignments);
+  const nowIso = new Date().toISOString();
+  const req = { id: newSwapId_(), day, fromName, toName, status: 'aprovada', createdAt: nowIso, respondedAt: nowIso, decidedAt: nowIso, month, appliedDirectlyByAdmin: true };
+  const swaps = await getCSwaps(month);
+  swaps.push(req);
+  await setCSwaps(month, swaps);
+  logEvent('admin', adminActorLabel_(), 'Aplicou troca direta (CEMADEN) — dia ' + day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
+  backendNotifySwapApproved('cemaden', 'CEMADEN', month, day, fromName, toName);
+  statusEl.style.color = '#22c55e';
+  statusEl.textContent = 'Troca aplicada com sucesso.';
   await loadCSwapsPanel(month);
   await renderCCalendarList().catch(()=>{});
 }
@@ -6011,6 +6189,15 @@ async function loadENSwapsPanel(month){
     if(req) copyTextToClipboard_(swapCopyLine_('Adm Comitê El Niño', month, req), btn);
   });
 
+  const directCard = document.getElementById('en-swap-admin-direct-card');
+  if(isAdmin && isCurrentMonth){
+    directCard.style.display = 'block';
+    populateSwapAdminDirect_('en', roster, assignments, month, enSlotNames_);
+    document.getElementById('en-swap-admin-direct-btn').onclick = enSwapAdminDirect_;
+  } else {
+    directCard.style.display = 'none';
+  }
+
   const adminWrap = document.getElementById('en-swap-admin-wrap');
   if(isAdmin || isSupervisor){
     adminWrap.style.display = 'block';
@@ -6123,6 +6310,43 @@ async function enSwapUndo_(id){
   req.undoneAt = new Date().toISOString();
   await setENSwaps(month, list);
   logEvent('admin', 'Admin', 'Desfez troca (Adm Comitê El Niño) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
+  await loadENSwapsPanel(month);
+  await renderENCalendarList().catch(()=>{});
+}
+
+// Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
+// quem sai/quem entra aceitar — fica registrada como aprovada de cara, com
+// o autor identificado (Admin Master ou Admin do setor) pra auditoria.
+async function enSwapAdminDirect_(){
+  const month = currentMonthISO_();
+  const day = document.getElementById('en-swap-admin-day-select').value;
+  const fromName = document.getElementById('en-swap-admin-from-select').value;
+  const toName = document.getElementById('en-swap-admin-to-select').value;
+  const statusEl = document.getElementById('en-swap-admin-direct-status');
+  if(!day || !fromName || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia, quem sai e quem entra.'; return; }
+  if(fromName === toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha pessoas diferentes.'; return; }
+  const assignments = await getENAssignments(month);
+  const slots = (assignments[day] || []).slice();
+  const idx = slots.indexOf(fromName);
+  if(idx === -1 || slots.includes(toName)){
+    statusEl.style.color = '#f87171';
+    statusEl.textContent = 'Essa vaga mudou desde que a tela carregou. Atualizando...';
+    await loadENSwapsPanel(month);
+    return;
+  }
+  const before = slots.slice();
+  slots[idx] = toName;
+  assignments[day] = slots;
+  await setENAssignments(month, assignments);
+  const nowIso = new Date().toISOString();
+  const req = { id: newSwapId_(), day, fromName, toName, status: 'aprovada', createdAt: nowIso, respondedAt: nowIso, decidedAt: nowIso, month, appliedDirectlyByAdmin: true };
+  const swaps = await getENSwaps(month);
+  swaps.push(req);
+  await setENSwaps(month, swaps);
+  logEvent('admin', adminActorLabel_(), 'Aplicou troca direta (Adm Comitê El Niño) — dia ' + day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
+  backendNotifySwapApproved('cemaden', 'Adm Comitê El Niño', month, day, fromName, toName);
+  statusEl.style.color = '#22c55e';
+  statusEl.textContent = 'Troca aplicada com sucesso.';
   await loadENSwapsPanel(month);
   await renderENCalendarList().catch(()=>{});
 }
@@ -6976,6 +7200,15 @@ async function loadNSwapsPanel(month){
     if(req) copyTextToClipboard_(swapCopyLine_('NIIAD', month, req), btn);
   });
 
+  const directCard = document.getElementById('n-swap-admin-direct-card');
+  if(isAdmin && isCurrentMonth){
+    directCard.style.display = 'block';
+    populateSwapAdminDirect_('n', roster, assignments, month, nSlotNames_);
+    document.getElementById('n-swap-admin-direct-btn').onclick = nSwapAdminDirect_;
+  } else {
+    directCard.style.display = 'none';
+  }
+
   const adminWrap = document.getElementById('n-swap-admin-wrap');
   if(isAdmin || isSupervisor){
     adminWrap.style.display = 'block';
@@ -7112,6 +7345,55 @@ async function nSwapUndo_(id){
   req.undoneAt = new Date().toISOString();
   await setNSwaps(month, list);
   logEvent('admin', 'Admin', 'Desfez troca (NIIAD) — dia ' + req.day + ': ' + before + ' → ' + nSlotNames_(slots).join(', '));
+  await loadNSwapsPanel(month);
+  await renderNCalendarList().catch(()=>{});
+}
+
+// Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
+// quem sai/quem entra aceitar — fica registrada como aprovada de cara, com
+// o autor identificado (Admin Master ou Admin do setor) pra auditoria. Pede
+// Ordinário/RAS pra quem entra, igual o fluxo normal de aprovação (nSwapDecide_)
+// e o "Assumir vaga" — a marcação é escolha de quem assume, não herdada.
+async function nSwapAdminDirect_(){
+  const month = currentMonthISO_();
+  const day = document.getElementById('n-swap-admin-day-select').value;
+  const fromName = document.getElementById('n-swap-admin-from-select').value;
+  const toName = document.getElementById('n-swap-admin-to-select').value;
+  const statusEl = document.getElementById('n-swap-admin-direct-status');
+  if(!day || !fromName || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia, quem sai e quem entra.'; return; }
+  if(fromName === toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha pessoas diferentes.'; return; }
+  const assignments = await getNAssignments(month);
+  const slots = (assignments[day] || []).slice();
+  const idx = slots.findIndex(raw=> nSlotName_(raw) === fromName);
+  if(idx === -1 || nSlotNames_(slots).includes(toName)){
+    statusEl.style.color = '#f87171';
+    statusEl.textContent = 'Essa vaga mudou desde que a tela carregou. Atualizando...';
+    await loadNSwapsPanel(month);
+    return;
+  }
+  const norm = nNormalizeSlot_(slots[idx]);
+  const dayTypes = await getNDayTypes(month);
+  const dayType = nDayType(dayTypes, month, Number(day));
+  let isOrd = false;
+  if(dayType === 'preto'){
+    const choice = await askChoice_('A vaga do dia ' + day + ' passa a contar como o quê pra ' + toName + '?', 'Ordinário', 'Preto (RAS)');
+    if(choice === null) return; // admin desistiu — nada foi alterado ainda
+    isOrd = choice === 'a';
+  }
+  const before = nSlotNames_(slots).join(', ');
+  slots[idx] = { name: toName, ord: isOrd };
+  assignments[day] = slots;
+  await setNAssignments(month, assignments);
+  const nowIso = new Date().toISOString();
+  const typeLabel = isOrd ? 'ORD' : 'RAS';
+  const req = { id: newSwapId_(), day, fromName, toName, status: 'aprovada', createdAt: nowIso, respondedAt: nowIso, decidedAt: nowIso, month, typeLabel, fromOrd: !!norm.ord, appliedDirectlyByAdmin: true };
+  const swaps = await getNSwaps(month);
+  swaps.push(req);
+  await setNSwaps(month, swaps);
+  logEvent('admin', adminActorLabel_(), 'Aplicou troca direta (NIIAD) — dia ' + day + ': ' + before + ' → ' + nSlotNames_(slots).join(', ') + ' (' + typeLabel + ' para ' + toName + ')');
+  backendNotifySwapApproved('niiad', 'NIIAD', month, day, fromName, toName);
+  statusEl.style.color = '#22c55e';
+  statusEl.textContent = 'Troca aplicada com sucesso.';
   await loadNSwapsPanel(month);
   await renderNCalendarList().catch(()=>{});
 }
