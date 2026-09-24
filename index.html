@@ -4008,10 +4008,14 @@ async function loadSSwapsPanel(month){
   });
 
   const directCard = document.getElementById('s-swap-admin-direct-card');
-  if(isAdmin && isCurrentMonth){
+  // A troca direta do admin vale pro mês vigente E pro mês seguinte — os
+  // demais controles de troca (propor/aceitar/aprovar comum) continuam só no
+  // vigente, sem mudança.
+  const isNextMonth = month === nextMonthISO_(currentMonthISO_());
+  if(isAdmin && (isCurrentMonth || isNextMonth)){
     directCard.style.display = 'block';
     populateSwapAdminDirect_('s', roster, assignments, month, sSlotNames_);
-    document.getElementById('s-swap-admin-direct-btn').onclick = sSwapAdminDirect_;
+    document.getElementById('s-swap-admin-direct-btn').onclick = ()=> sSwapAdminDirect_(month);
   } else {
     directCard.style.display = 'none';
   }
@@ -4150,8 +4154,8 @@ async function sSwapUndo_(id){
 // Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
 // quem sai/quem entra aceitar — fica registrada como aprovada de cara, com
 // o autor identificado (Admin Master ou Admin do setor) pra auditoria.
-async function sSwapAdminDirect_(){
-  const month = currentMonthISO_();
+async function sSwapAdminDirect_(month){
+  month = month || currentMonthISO_();
   const day = document.getElementById('s-swap-admin-day-select').value;
   const fromName = document.getElementById('s-swap-admin-from-select').value;
   const toName = document.getElementById('s-swap-admin-to-select').value;
@@ -4181,7 +4185,8 @@ async function sSwapAdminDirect_(){
   statusEl.style.color = '#22c55e';
   statusEl.textContent = 'Troca aplicada com sucesso.';
   await loadSSwapsPanel(month);
-  await renderSCalendarList().catch(()=>{});
+  const isCM = month === currentMonthISO_();
+  await renderSCalendarList(null, {idPrefix: isCM ? 's' : 's-pick-next', month}).catch(()=>{});
 }
 
 /* ---------- SUBSEGOP Serviço Mensal: aba Registrar ---------- */
@@ -5095,10 +5100,14 @@ async function loadCSwapsPanel(month){
   });
 
   const directCard = document.getElementById('c-swap-admin-direct-card');
-  if(isAdmin && isCurrentMonth){
+  // A troca direta do admin vale pro mês vigente E pro mês seguinte — os
+  // demais controles de troca (propor/aceitar/aprovar comum) continuam só no
+  // vigente, sem mudança.
+  const isNextMonth = month === nextMonthISO_(currentMonthISO_());
+  if(isAdmin && (isCurrentMonth || isNextMonth)){
     directCard.style.display = 'block';
     populateSwapAdminDirect_('c', roster, assignments, month, cSlotNames_);
-    document.getElementById('c-swap-admin-direct-btn').onclick = cSwapAdminDirect_;
+    document.getElementById('c-swap-admin-direct-btn').onclick = ()=> cSwapAdminDirect_(month);
   } else {
     directCard.style.display = 'none';
   }
@@ -5222,8 +5231,8 @@ async function cSwapUndo_(id){
 // Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
 // quem sai/quem entra aceitar — fica registrada como aprovada de cara, com
 // o autor identificado (Admin Master ou Admin do setor) pra auditoria.
-async function cSwapAdminDirect_(){
-  const month = currentMonthISO_();
+async function cSwapAdminDirect_(month){
+  month = month || currentMonthISO_();
   const day = document.getElementById('c-swap-admin-day-select').value;
   const fromName = document.getElementById('c-swap-admin-from-select').value;
   const toName = document.getElementById('c-swap-admin-to-select').value;
@@ -5253,7 +5262,8 @@ async function cSwapAdminDirect_(){
   statusEl.style.color = '#22c55e';
   statusEl.textContent = 'Troca aplicada com sucesso.';
   await loadCSwapsPanel(month);
-  await renderCCalendarList().catch(()=>{});
+  const isCM = month === currentMonthISO_();
+  await renderCCalendarList(null, {idPrefix: isCM ? 'c' : 'c-pick-next', month}).catch(()=>{});
 }
 
 /* ---------- CEMADEN: aba Registrar Serviço ---------- */
@@ -6190,10 +6200,14 @@ async function loadENSwapsPanel(month){
   });
 
   const directCard = document.getElementById('en-swap-admin-direct-card');
-  if(isAdmin && isCurrentMonth){
+  // A troca direta do admin vale pro mês vigente E pro mês seguinte — os
+  // demais controles de troca (propor/aceitar/aprovar comum) continuam só no
+  // vigente, sem mudança.
+  const isNextMonth = month === nextMonthISO_(currentMonthISO_());
+  if(isAdmin && (isCurrentMonth || isNextMonth)){
     directCard.style.display = 'block';
     populateSwapAdminDirect_('en', roster, assignments, month, enSlotNames_);
-    document.getElementById('en-swap-admin-direct-btn').onclick = enSwapAdminDirect_;
+    document.getElementById('en-swap-admin-direct-btn').onclick = ()=> enSwapAdminDirect_(month);
   } else {
     directCard.style.display = 'none';
   }
@@ -6317,8 +6331,8 @@ async function enSwapUndo_(id){
 // Troca unilateral do admin: propõe E autoriza numa ação só, sem esperar
 // quem sai/quem entra aceitar — fica registrada como aprovada de cara, com
 // o autor identificado (Admin Master ou Admin do setor) pra auditoria.
-async function enSwapAdminDirect_(){
-  const month = currentMonthISO_();
+async function enSwapAdminDirect_(month){
+  month = month || currentMonthISO_();
   const day = document.getElementById('en-swap-admin-day-select').value;
   const fromName = document.getElementById('en-swap-admin-from-select').value;
   const toName = document.getElementById('en-swap-admin-to-select').value;
@@ -6348,7 +6362,8 @@ async function enSwapAdminDirect_(){
   statusEl.style.color = '#22c55e';
   statusEl.textContent = 'Troca aplicada com sucesso.';
   await loadENSwapsPanel(month);
-  await renderENCalendarList().catch(()=>{});
+  const isCM = month === currentMonthISO_();
+  await renderENCalendarList(null, {idPrefix: isCM ? 'en' : 'en-pick-next', month}).catch(()=>{});
 }
 
 /* ---------- Adm Comitê El Niño: aba Escolher meus dias ---------- */
@@ -7201,10 +7216,15 @@ async function loadNSwapsPanel(month){
   });
 
   const directCard = document.getElementById('n-swap-admin-direct-card');
-  if(isAdmin && isCurrentMonth){
+  // A troca direta do admin vale pro mês vigente E pro mês seguinte (já dá
+  // pra ajustar quem faz o quê em "Montar mês seguinte" antes de virar o mês
+  // vigente) — os demais controles de troca (propor/aceitar/aprovar comum)
+  // continuam só no vigente, sem mudança.
+  const isNextMonth = month === nextMonthISO_(currentMonthISO_());
+  if(isAdmin && (isCurrentMonth || isNextMonth)){
     directCard.style.display = 'block';
     populateSwapAdminDirect_('n', roster, assignments, month, nSlotNames_);
-    document.getElementById('n-swap-admin-direct-btn').onclick = nSwapAdminDirect_;
+    document.getElementById('n-swap-admin-direct-btn').onclick = ()=> nSwapAdminDirect_(month);
   } else {
     directCard.style.display = 'none';
   }
@@ -7354,8 +7374,8 @@ async function nSwapUndo_(id){
 // o autor identificado (Admin Master ou Admin do setor) pra auditoria. Pede
 // Ordinário/RAS pra quem entra, igual o fluxo normal de aprovação (nSwapDecide_)
 // e o "Assumir vaga" — a marcação é escolha de quem assume, não herdada.
-async function nSwapAdminDirect_(){
-  const month = currentMonthISO_();
+async function nSwapAdminDirect_(month){
+  month = month || currentMonthISO_();
   const day = document.getElementById('n-swap-admin-day-select').value;
   const fromName = document.getElementById('n-swap-admin-from-select').value;
   const toName = document.getElementById('n-swap-admin-to-select').value;
@@ -7395,7 +7415,8 @@ async function nSwapAdminDirect_(){
   statusEl.style.color = '#22c55e';
   statusEl.textContent = 'Troca aplicada com sucesso.';
   await loadNSwapsPanel(month);
-  await renderNCalendarList().catch(()=>{});
+  const isCM = month === currentMonthISO_();
+  await renderNCalendarList(null, {idPrefix: isCM ? 'n' : 'n-pick-next', month}).catch(()=>{});
 }
 
 /* ---------- NIIAD: aba Escolher meus dias ---------- */
