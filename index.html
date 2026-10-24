@@ -473,16 +473,19 @@
   </div>
 
   <div class="card" id="ferias-card" style="margin-top:16px;display:none;">
-    <label style="margin-top:0;">🏖️ Férias por período (preenchimento automático)</label>
-    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Informe a pessoa e o período. Nos dias do período a escala passa a mostrar <strong>Férias</strong> automaticamente (inclusive sábado e domingo) e a pessoa não precisa marcar nada; feriados da semana continuam sem expediente. Vale para qualquer semana e muda sozinha se você remover o período.</p>
-    <select id="ferias-name-select"></select>
-    <div style="display:flex;gap:12px;flex-wrap:wrap;">
-      <div style="flex:1;min-width:140px;"><label>Início</label><input type="date" id="ferias-start"></div>
-      <div style="flex:1;min-width:140px;"><label>Fim</label><input type="date" id="ferias-end"></div>
+    <label style="margin-top:0;" id="ferias-title">🏖️ Férias registradas</label>
+    <div id="ferias-form">
+      <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Informe a pessoa e o período. Nos dias do período a escala passa a mostrar <strong>Férias</strong> automaticamente (inclusive sábado e domingo) e a pessoa não precisa marcar nada; feriados da semana continuam sem expediente. Vale para qualquer semana e muda sozinha se você remover o período.</p>
+      <select id="ferias-name-select"></select>
+      <div style="display:flex;gap:12px;flex-wrap:wrap;">
+        <div style="flex:1;min-width:140px;"><label>Início</label><input type="date" id="ferias-start"></div>
+        <div style="flex:1;min-width:140px;"><label>Fim</label><input type="date" id="ferias-end"></div>
+      </div>
+      <button class="save-btn" id="ferias-add-btn">Adicionar período de férias</button>
+      <div class="status" id="ferias-status"></div>
     </div>
-    <button class="save-btn" id="ferias-add-btn">Adicionar período de férias</button>
-    <div class="status" id="ferias-status"></div>
     <div id="ferias-list" style="margin-top:12px;"></div>
+    <a href="#" id="ferias-toggle-old" style="display:none;font-size:12px;color:var(--muted);"></a>
   </div>
 
   <div class="card" style="margin-top:16px;">
@@ -3421,8 +3424,9 @@ async function getFerias_(){
 function renderFeriasCard_(canManage, roster, afterChange){
   const card = document.getElementById('ferias-card');
   if(!card) return;
-  card.style.display = canManage ? 'block' : 'none';
-  if(!canManage) return;
+  card.style.display = 'block';
+  document.getElementById('ferias-form').style.display = canManage ? '' : 'none';
+  document.getElementById('ferias-title').textContent = canManage ? '🏖️ Férias por período (preenchimento automático)' : '🏖️ Férias registradas';
   const nameSel = document.getElementById('ferias-name-select');
   const startEl = document.getElementById('ferias-start');
   const endEl = document.getElementById('ferias-end');
@@ -3432,8 +3436,15 @@ function renderFeriasCard_(canManage, roster, afterChange){
     sortByRank_(roster).map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
 
   const todayIso = feriasIso_(new Date());
+  const toggleEl = document.getElementById('ferias-toggle-old');
+  let showOld = false;
+  toggleEl.onclick = (e)=>{ e.preventDefault(); showOld = !showOld; renderList(); };
   const renderList = ()=>{
-    const list = ((expedienteCache_ && expedienteCache_.ferias) || []).slice()
+    const all = ((expedienteCache_ && expedienteCache_.ferias) || []);
+    const oldCount = all.filter(p=> p.end < todayIso).length;
+    toggleEl.style.display = oldCount ? '' : 'none';
+    toggleEl.textContent = showOld ? 'Ocultar períodos encerrados' : 'Ver períodos encerrados (' + oldCount + ')';
+    const list = all.filter(p=> showOld || p.end >= todayIso).slice()
       .sort((a,b)=> (a.end < todayIso ? 1 : 0) - (b.end < todayIso ? 1 : 0) || a.start.localeCompare(b.start));
     listEl.innerHTML = list.length ? list.map(p=>{
       const person = roster.find(r=> r.name === p.name) || { name: p.name };
@@ -3441,8 +3452,8 @@ function renderFeriasCard_(canManage, roster, afterChange){
       return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;${state === 'encerrado' ? 'opacity:.55;' : ''}">
         <div style="font-size:13px;color:var(--text);"><strong>${origEsc_(displayName_(person))}</strong> — ${feriasFmt_(p.start)} a ${feriasFmt_(p.end)}
           <span style="font-size:11px;color:var(--muted);">(${state})</span></div>
-        <button class="add-row-btn" style="margin:0;" data-ferias-del="${p.id}">Remover</button></div>`;
-    }).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Nenhum período de férias cadastrado.</p>';
+        ${canManage ? `<button class="add-row-btn" style="margin:0;" data-ferias-del="${p.id}">Remover</button>` : ''}</div>`;
+    }).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Nenhum período de férias em curso ou futuro.</p>';
     listEl.querySelectorAll('[data-ferias-del]').forEach(btn=> btn.onclick = async ()=>{
       const p = list.find(x=> x.id === btn.dataset.feriasDel);
       if(!p) return;
