@@ -282,6 +282,23 @@
     .roster-row input,.roster-row select{min-width:100%;}
     .n-slot{min-width:100%;}
   }
+  .orig-banner{background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 14px;font-size:13px;color:var(--text);margin-bottom:8px;}
+  .orig-banner.orig-warn{background:#422006;border-color:#854d0e;color:#fde68a;}
+  .orig-wrap{overflow-x:auto;margin-top:10px;}
+  .orig-table{width:100%;border-collapse:collapse;font-size:13px;color:var(--text);}
+  .orig-table th{background:var(--card2);text-align:left;padding:8px 10px;border:1px solid var(--border);font-size:12px;text-transform:uppercase;letter-spacing:.3px;color:var(--muted);}
+  .orig-table td{padding:8px 10px;border:1px solid var(--border);vertical-align:top;}
+  .orig-table tr.orig-row-changed td{background:rgba(245,158,11,.08);}
+  .orig-table td.orig-day{white-space:nowrap;}
+  .orig-time{color:var(--muted);font-size:11px;}
+  .orig-empty{color:var(--muted);font-size:12px;}
+  .orig-step{margin-bottom:4px;}
+  .orig-step-undo{color:var(--muted);text-decoration:line-through;}
+  .orig-step-warn{color:#fbbf24;font-size:12px;}
+  .orig-tag{display:inline-block;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:0 6px;font-size:10px;font-weight:700;}
+  .orig-tag-admin{background:#854d0e;border-color:#854d0e;color:white;}
+  .orig-up{color:#22c55e;font-weight:700;}
+  .orig-down{color:#f87171;font-weight:700;}
 </style>
 
 </head>
@@ -378,6 +395,7 @@
       <div class="tab tab-grp-subsegop-serv" data-panel="admin-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar Serviço Mensal</div>
       <div class="tab tab-grp-proximo" data-panel="fill-subsegop-serv-next" data-group="subsegop">Meus serviços — próximo mês</div>
       <div class="tab tab-grp-proximo" data-panel="admin-subsegop-serv-next" data-admin-only="true" data-admin-only-setor="subsegop">Montar mês seguinte</div>
+      <div class="tab" data-panel="originais-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Escalas Originais</div>
     </div>
   </div>
 
@@ -396,6 +414,7 @@
       <div class="tab tab-grp-proximo-fill" data-panel="fill-elnino-next" data-group="cemaden">Serviço El Niño — próximo mês</div>
       <div class="tab tab-grp-proximo-admin" data-panel="admin-cemaden-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (CEMADEN)</div>
       <div class="tab tab-grp-proximo-admin" data-panel="admin-elnino-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (El Niño)</div>
+      <div class="tab" data-panel="originais-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Escalas Originais</div>
     </div>
   </div>
 
@@ -408,6 +427,7 @@
       <div class="tab tab-grp-atual" data-panel="admin-niiad" data-admin-only="true" data-admin-only-setor="niiad">Configurar NIIAD</div>
       <div class="tab tab-grp-proximo" data-panel="fill-niiad-next" data-group="niiad">Meus Serviços — próximo mês</div>
       <div class="tab tab-grp-proximo" data-panel="admin-niiad-next" data-admin-only="true" data-admin-only-setor="niiad">Montar mês seguinte</div>
+      <div class="tab" data-panel="originais-niiad" data-admin-only="true" data-admin-only-setor="niiad">Escalas Originais</div>
     </div>
   </div>
 
@@ -1616,6 +1636,11 @@
     <div class="status" id="log-clear-status"></div>
   </div>
 </div>
+
+<!-- ======================= ESCALAS ORIGINAIS (admin) ======================= -->
+<div class="panel" id="panel-originais-subsegop"></div>
+<div class="panel" id="panel-originais-cemaden"></div>
+<div class="panel" id="panel-originais-niiad"></div>
 
 <!-- ======================= VISÃO DO DIA ======================= -->
 <div class="panel" id="panel-visao-dia">
@@ -2918,6 +2943,7 @@ function loadPanel(name){
   else if(name === 'admin-niiad') loadNAdminPanel();
   else if(name === 'admin-niiad-next') loadNAdminNextPanel();
   else if(name === 'log-uso') loadLogPanel();
+  else if(name.indexOf('originais-') === 0) loadOriginaisPanel(name.slice('originais-'.length));
   else if(name === 'visao-dia') loadVisaoDiaPanel();
 }
 
@@ -4103,6 +4129,7 @@ async function sSwapDecide_(id, approve){
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadSSwapsPanel(month); return; }
   if(approve){
+    await ensureOriginalSchedule_('subsegop_serv', month);
     const assignments = await getSAssignments(month);
     const slots = assignments[req.day] || [];
     const idx = slots.indexOf(req.fromName);
@@ -4165,6 +4192,7 @@ async function sSwapUndo_(id, month){
 // o autor identificado (Admin Master ou Admin do setor) pra auditoria.
 async function sSwapAdminDirect_(month){
   month = month || currentMonthISO_();
+  await ensureOriginalSchedule_('subsegop_serv', month);
   const day = document.getElementById('s-swap-admin-day-select').value;
   const fromName = document.getElementById('s-swap-admin-from-select').value;
   const toName = document.getElementById('s-swap-admin-to-select').value;
@@ -5185,6 +5213,7 @@ async function cSwapDecide_(id, approve){
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadCSwapsPanel(month); return; }
   if(approve){
+    await ensureOriginalSchedule_('cemaden', month);
     const assignments = await getCAssignments(month);
     const slots = assignments[req.day] || [];
     const idx = slots.indexOf(req.fromName);
@@ -5243,6 +5272,7 @@ async function cSwapUndo_(id, month){
 // o autor identificado (Admin Master ou Admin do setor) pra auditoria.
 async function cSwapAdminDirect_(month){
   month = month || currentMonthISO_();
+  await ensureOriginalSchedule_('cemaden', month);
   const day = document.getElementById('c-swap-admin-day-select').value;
   const fromName = document.getElementById('c-swap-admin-from-select').value;
   const toName = document.getElementById('c-swap-admin-to-select').value;
@@ -6286,6 +6316,7 @@ async function enSwapDecide_(id, approve){
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadENSwapsPanel(month); return; }
   if(approve){
+    await ensureOriginalSchedule_('elnino', month);
     const assignments = await getENAssignments(month);
     const slots = assignments[req.day] || [];
     const idx = slots.indexOf(req.fromName);
@@ -6344,6 +6375,7 @@ async function enSwapUndo_(id, month){
 // o autor identificado (Admin Master ou Admin do setor) pra auditoria.
 async function enSwapAdminDirect_(month){
   month = month || currentMonthISO_();
+  await ensureOriginalSchedule_('elnino', month);
   const day = document.getElementById('en-swap-admin-day-select').value;
   const fromName = document.getElementById('en-swap-admin-from-select').value;
   const toName = document.getElementById('en-swap-admin-to-select').value;
@@ -7319,6 +7351,7 @@ async function nSwapDecide_(id, approve){
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadNSwapsPanel(month); return; }
   if(approve){
+    await ensureOriginalSchedule_('niiad', month);
     const assignments = await getNAssignments(month);
     const slots = assignments[req.day] || [];
     const idx = slots.findIndex(raw=> nSlotName_(raw) === req.fromName);
@@ -7398,6 +7431,7 @@ async function nSwapUndo_(id, month){
 // e o "Assumir vaga" — a marcação é escolha de quem assume, não herdada.
 async function nSwapAdminDirect_(month){
   month = month || currentMonthISO_();
+  await ensureOriginalSchedule_('niiad', month);
   const day = document.getElementById('n-swap-admin-day-select').value;
   const fromName = document.getElementById('n-swap-admin-from-select').value;
   const toName = document.getElementById('n-swap-admin-to-select').value;
@@ -8224,6 +8258,260 @@ document.getElementById('log-clear-btn').onclick = async ()=>{
   }
   setTimeout(()=> statusEl.textContent='', 4000);
 };
+
+/* ============================================================
+   ESCALAS ORIGINAIS — foto da distribuição do admin ANTES das trocas,
+   guardada no backend (aba "Escalas Originais" da planilha de log) e
+   comparada com a escala atual + o caminho das permutas aprovadas.
+   Cada grupo tem as mesmas chaves <grupo>_assign/_swaps/_daytypes
+   (por mês), então a tela é genérica pros 4 grupos.
+   ============================================================ */
+const ORIG_GROUPS_BY_SETOR_ = {
+  subsegop: [{ id:'subsegop_serv', label:'SUBSEGOP — Serviço Mensal', monthList: K_S_MONTHLIST }],
+  cemaden:  [{ id:'cemaden', label:'Of Lig CEMADEN', monthList: K_C_MONTHLIST },
+             { id:'elnino',  label:'Comitê El Niño',  monthList: K_EN_MONTHLIST }],
+  niiad:    [{ id:'niiad',   label:'NIIAD',           monthList: K_N_MONTHLIST }]
+};
+
+function origEsc_(s){
+  return String(s == null ? '' : s).replace(/[&<>"]/g, c=> ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+}
+// NIIAD guarda cada vaga como {name, ord}; os demais grupos, só o nome.
+function origSlotInfo_(raw){
+  if(raw && typeof raw === 'object') return { name: raw.name, ord: !!raw.ord };
+  return { name: raw, ord: false };
+}
+function origNames_(slots){
+  return (slots || []).map(origSlotInfo_).map(s=> s.name).filter(Boolean);
+}
+function origSlotsHtml_(slots){
+  const infos = (slots || []).map(origSlotInfo_).filter(s=> s.name);
+  if(!infos.length) return '<span class="orig-empty">—</span>';
+  return infos.map(s=> origEsc_(s.name) + (s.ord ? ' <span class="orig-tag">ORD</span>' : '')).join('<br>');
+}
+function origFmtTime_(iso){
+  try{
+    return new Date(iso).toLocaleString('pt-BR', {day:'2-digit', month:'2-digit', hour:'2-digit', minute:'2-digit'});
+  }catch(e){ return iso || ''; }
+}
+
+async function backendOriginals_(payload){
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify(Object.assign({ secret: BACKEND_SECRET }, payload))
+  });
+  if(!res.ok) throw new Error("HTTP " + res.status);
+  return res.json();
+}
+
+// Chamado logo antes de uma troca alterar a escala (aprovação / troca direta
+// do admin): se o mês vigente ainda não tem original guardado, congela a
+// escala como está agora. Best effort — nunca trava a troca.
+async function ensureOriginalSchedule_(group, month){
+  if(month !== currentMonthISO_()) return;
+  try{ await backendOriginals_({ action:'ensure_original_schedule', group, month }); }
+  catch(e){ /* sem original automático desta vez; o admin ainda pode congelar à mão */ }
+}
+
+function origParse_(batch, key, fallback){
+  const r = batch[key];
+  if(!r) return fallback;
+  try{ return JSON.parse(r.value); }catch(e){ return fallback; }
+}
+
+async function loadOriginaisPanel(setor){
+  const el = document.getElementById('panel-originais-' + setor);
+  if(!el) return;
+  const groups = ORIG_GROUPS_BY_SETOR_[setor] || [];
+  if(!el.dataset.built){
+    el.dataset.built = '1';
+    el.innerHTML = `
+      <div class="roster-card" style="max-width:900px;">
+        <label style="margin-top:0;">Escalas originais</label>
+        <p style="font-size:11px;color:var(--muted);margin:0 0 12px;">Foto da distribuição feita pelo admin <strong>antes das trocas de plantão</strong>. Aqui você compara com a escala atual e vê o caminho de cada permuta aprovada. A foto é tirada automaticamente na primeira troca do mês vigente; use <strong>Congelar</strong> quando terminar de montar a escala (cada congelamento cria uma nova versão e a última passa a valer como original).</p>
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;">
+          <select id="orig-group-${setor}" style="max-width:240px;${groups.length < 2 ? 'display:none;' : ''}">
+            ${groups.map(g=> `<option value="${g.id}">${origEsc_(g.label)}</option>`).join('')}
+          </select>
+          <select id="orig-month-${setor}" style="max-width:220px;"></select>
+          <button id="orig-refresh-${setor}" class="save-btn" style="margin-top:0;width:auto;padding:8px 16px;background:var(--card2);color:var(--text);border:1px solid var(--border);">Atualizar</button>
+          <button id="orig-freeze-${setor}" class="save-btn" style="margin-top:0;width:auto;padding:8px 16px;">❄️ Congelar escala atual como original</button>
+        </div>
+        <div class="status" id="orig-status-${setor}"></div>
+      </div>
+      <div id="orig-info-${setor}" style="max-width:900px;"></div>
+      <div id="orig-result-${setor}"></div>`;
+    document.getElementById('orig-group-' + setor).onchange = ()=> loadOriginaisMonths_(setor);
+    document.getElementById('orig-month-' + setor).onchange = ()=> renderOriginais_(setor);
+    document.getElementById('orig-refresh-' + setor).onclick = ()=> renderOriginais_(setor);
+    document.getElementById('orig-freeze-' + setor).onclick = ()=> freezeOriginal_(setor);
+  }
+  await loadOriginaisMonths_(setor);
+}
+
+async function loadOriginaisMonths_(setor){
+  const group = ORIG_GROUPS_BY_SETOR_[setor].find(g=> g.id === document.getElementById('orig-group-' + setor).value)
+    || ORIG_GROUPS_BY_SETOR_[setor][0];
+  const monthSel = document.getElementById('orig-month-' + setor);
+  let months = [];
+  try{
+    const r = await window.storage.get(group.monthList, true);
+    months = r ? JSON.parse(r.value) : [];
+    if(!Array.isArray(months)) months = [];
+  }catch(e){ months = []; }
+  try{
+    const res = await backendOriginals_({ action:'list_original_schedules', group: group.id });
+    if(res.ok) (res.items || []).forEach(it=>{ if(months.indexOf(it.month) === -1) months.push(it.month); });
+  }catch(e){}
+  const cur = currentMonthISO_();
+  if(months.indexOf(cur) === -1) months.push(cur);
+  months = months.slice().sort().reverse();
+  const prev = monthSel.value;
+  monthSel.innerHTML = months.map(m=> `<option value="${m}">${monthLabel(m)}${m === cur ? ' (vigente)' : ''}</option>`).join('');
+  monthSel.value = months.indexOf(prev) !== -1 ? prev : cur;
+  await renderOriginais_(setor);
+}
+
+async function freezeOriginal_(setor){
+  const group = document.getElementById('orig-group-' + setor).value;
+  const month = document.getElementById('orig-month-' + setor).value;
+  const statusEl = document.getElementById('orig-status-' + setor);
+  const label = (ORIG_GROUPS_BY_SETOR_[setor].find(g=> g.id === group) || {}).label || group;
+  const ok = await askConfirm('Congelar a escala ATUAL de ' + label + ' (' + monthLabel(month) + ') como a escala original? Ela passa a ser a referência para comparar com as trocas. Se já existir uma original, esta vira uma nova versão (a anterior fica guardada no histórico).');
+  if(!ok) return;
+  try{
+    const res = await backendOriginals_({ action:'save_original_schedule', group, month, adminPassword: currentAdminPassword, actor: adminActorLabel_() });
+    if(!res.ok) throw new Error(res.error || 'erro ao congelar');
+    logEvent('admin', adminActorLabel_(), 'Congelou a escala original (' + label + ', ' + month + ') — versão ' + res.version);
+    statusEl.style.color = '#22c55e';
+    statusEl.textContent = 'Escala original congelada (versão ' + res.version + ').';
+    await renderOriginais_(setor);
+  }catch(e){
+    statusEl.style.color = '#f87171';
+    statusEl.textContent = 'Erro ao congelar: ' + (e && e.message ? e.message : 'tente novamente.');
+  }
+  setTimeout(()=>{ statusEl.textContent = ''; }, 6000);
+}
+
+async function renderOriginais_(setor){
+  const group = document.getElementById('orig-group-' + setor).value;
+  const month = document.getElementById('orig-month-' + setor).value;
+  const infoEl = document.getElementById('orig-info-' + setor);
+  const resultEl = document.getElementById('orig-result-' + setor);
+  if(!group || !month) return;
+  infoEl.innerHTML = '<p style="color:var(--muted);font-size:13px;">Carregando...</p>';
+  resultEl.innerHTML = '';
+  try{
+    const [orig, batch] = await Promise.all([
+      backendOriginals_({ action:'get_original_schedule', group, month }),
+      window.storage.getBatch([monthKey_(group + '_assign', month), monthKey_(group + '_swaps', month)])
+    ]);
+    if(!orig.ok) throw new Error(orig.error || 'erro ao carregar');
+    const curAssign = origParse_(batch, monthKey_(group + '_assign', month), {}) || {};
+    const swaps = origParse_(batch, monthKey_(group + '_swaps', month), []);
+    const swapList = Array.isArray(swaps) ? swaps : [];
+
+    if(!orig.found){
+      const nSw = swapList.filter(s=> s.status === 'aprovada').length;
+      infoEl.innerHTML = `<div class="orig-banner orig-warn">Nenhuma escala original congelada para ${monthLabel(month)}.${nSw ? ' Já existem ' + nSw + ' troca(s) aprovada(s) neste mês — a comparação só fica completa depois de congelar uma original.' : ''} Use o botão <strong>Congelar</strong> acima${nSw ? ' (ele fotografa a escala como está agora, já com as trocas)' : ''}.</div>`;
+      return;
+    }
+
+    const origAssign = (orig.data && orig.data.assign) || {};
+    const origLabel = orig.origin === 'auto' ? 'automática, na 1ª troca' : 'manual';
+    infoEl.innerHTML = `<div class="orig-banner">Original congelada em <strong>${origFmtTime_(orig.savedAt)}</strong> por ${origEsc_(orig.actor)} (${origLabel}) — versão ${orig.versions}${orig.versions > 1 ? ' (a mais recente vale; as anteriores ficam guardadas na planilha)' : ''}.</div>`;
+
+    // Eventos de troca por dia, em ordem cronológica: aplicação (aprovada /
+    // direta do admin) e, quando houve, o desfazer.
+    const events = [];
+    swapList.forEach(s=>{
+      if(s.status !== 'aprovada' && s.status !== 'desfeita') return;
+      events.push({ t: s.decidedAt || s.respondedAt || s.createdAt || '', kind:'apply', s });
+      if(s.status === 'desfeita' && s.undoneAt) events.push({ t: s.undoneAt, kind:'undo', s });
+    });
+    events.sort((a,b)=> String(a.t).localeCompare(String(b.t)));
+    const byDay = {};
+    events.forEach(ev=>{ (byDay[String(ev.s.day)] = byDay[String(ev.s.day)] || []).push(ev); });
+
+    const total = daysInMonth(month);
+    const [yy, mm] = month.split('-').map(Number);
+    let rowsHtml = '';
+    let changedDays = 0, divergentDays = 0;
+    const origCount = {}, curCount = {};
+    for(let day = 1; day <= total; day++){
+      const k = String(day);
+      const oSlots = origAssign[k] || [];
+      const cSlots = curAssign[k] || [];
+      const oNames = origNames_(oSlots), cNames = origNames_(cSlots);
+      oNames.forEach(n=>{ origCount[n] = (origCount[n] || 0) + 1; });
+      cNames.forEach(n=>{ curCount[n] = (curCount[n] || 0) + 1; });
+      const evs = byDay[k] || [];
+      if(!oNames.length && !cNames.length && !evs.length) continue;
+
+      // Reaplica as trocas registradas sobre a original e confere se chega
+      // na escala atual; se não chegar, houve ajuste fora do fluxo de trocas.
+      const sim = oNames.slice();
+      evs.forEach(ev=>{
+        if(ev.kind === 'apply'){
+          const i = sim.indexOf(ev.s.fromName);
+          if(i !== -1 && sim.indexOf(ev.s.toName) === -1) sim[i] = ev.s.toName;
+        } else {
+          const i = sim.indexOf(ev.s.toName);
+          if(i !== -1 && sim.indexOf(ev.s.fromName) === -1) sim[i] = ev.s.fromName;
+        }
+      });
+      const same = (a, b)=> a.slice().sort().join('|') === b.slice().sort().join('|');
+      const changed = !same(oNames, cNames);
+      const divergent = !same(sim, cNames);
+      if(changed) changedDays++;
+      if(divergent) divergentDays++;
+
+      const dow = new Date(yy, mm - 1, day).toLocaleDateString('pt-BR', {weekday:'short'}).replace('.', '');
+      const pathHtml = evs.length ? evs.map(ev=>{
+        const s = ev.s;
+        const tag = s.typeLabel ? ` <span class="orig-tag">${origEsc_(s.typeLabel)}</span>` : '';
+        const direct = s.appliedDirectlyByAdmin ? ' <span class="orig-tag orig-tag-admin">direta do admin</span>' : '';
+        if(ev.kind === 'undo'){
+          return `<div class="orig-step orig-step-undo">↩️ desfeita: ${origEsc_(s.toName)} → ${origEsc_(s.fromName)} <span class="orig-time">${origFmtTime_(ev.t)}</span></div>`;
+        }
+        return `<div class="orig-step">${origEsc_(s.fromName)} → <strong>${origEsc_(s.toName)}</strong>${tag}${direct} <span class="orig-time">${origFmtTime_(ev.t)}</span></div>`;
+      }).join('') : '<span class="orig-empty">sem trocas</span>';
+      const warn = divergent ? '<div class="orig-step orig-step-warn">⚠️ A escala atual não bate com original + trocas registradas (ajuste manual fora das permutas?).</div>' : '';
+      rowsHtml += `<tr class="${changed ? 'orig-row-changed' : ''}">
+        <td class="orig-day"><strong>${String(day).padStart(2,'0')}</strong> <span class="orig-time">${dow}</span></td>
+        <td>${origSlotsHtml_(oSlots)}</td>
+        <td>${pathHtml}${warn}</td>
+        <td>${origSlotsHtml_(cSlots)}</td>
+      </tr>`;
+    }
+
+    // Resumo por pessoa: quantos dias tinha na original × quantos tem agora.
+    const people = Object.keys(Object.assign({}, origCount, curCount)).sort((a,b)=> a.localeCompare(b, 'pt-BR'));
+    const summaryRows = people.map(n=>{
+      const o = origCount[n] || 0, c = curCount[n] || 0, d = c - o;
+      const dTxt = d > 0 ? '+' + d : String(d);
+      return `<tr><td>${origEsc_(n)}</td><td>${o}</td><td>${c}</td><td class="${d > 0 ? 'orig-up' : d < 0 ? 'orig-down' : ''}">${d === 0 ? '—' : dTxt}</td></tr>`;
+    }).join('');
+
+    resultEl.innerHTML = `
+      <div class="count-badge" style="margin-top:12px;">${changedDays} dia(s) com vaga diferente da original · ${events.filter(e=> e.kind === 'apply').length} troca(s) aplicada(s)${divergentDays ? ' · ⚠️ ' + divergentDays + ' dia(s) com divergência' : ''}</div>
+      <div class="orig-wrap">
+        <table class="orig-table">
+          <thead><tr><th>Dia</th><th>Original</th><th>Caminho das permutas</th><th>Atual</th></tr></thead>
+          <tbody>${rowsHtml || '<tr><td colspan="4" class="orig-empty">Nenhum dia preenchido.</td></tr>'}</tbody>
+        </table>
+      </div>
+      <div class="orig-wrap" style="max-width:520px;margin-top:16px;">
+        <table class="orig-table">
+          <thead><tr><th>Pessoa</th><th>Original</th><th>Atual</th><th>Diferença</th></tr></thead>
+          <tbody>${summaryRows || '<tr><td colspan="4" class="orig-empty">Sem dados.</td></tr>'}</tbody>
+        </table>
+      </div>`;
+  }catch(e){
+    infoEl.innerHTML = '<p style="color:#f87171;font-size:13px;">Erro ao carregar: ' + origEsc_(e && e.message ? e.message : 'tente novamente.') + '</p>';
+  }
+}
 
 /* ============================================================
    VISÃO DO DIA — quem está de serviço em cada função, num dia
