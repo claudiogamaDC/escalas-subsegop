@@ -1461,6 +1461,29 @@
     <button class="save-btn" id="n-swap-propose-btn">Enviar pedido de troca</button>
     <div class="status" id="n-swap-propose-status"></div>
   </div>
+  <div class="roster-card" id="n-perm-card">
+    <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
+    <select id="n-perm-day-select"></select>
+    <label>Permutar com</label>
+    <select id="n-perm-target-select"></select>
+    <label>Dia dessa pessoa que passo a assumir</label>
+    <select id="n-perm-theirday-select"></select>
+    <div id="n-perm-preview" style="font-size:12px;color:var(--muted);margin-top:8px;"></div>
+    <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">Na permuta cada pessoa mantém o seu tipo (ORD ou RAS). Dois dias RAS seguidos não são permitidos.</p>
+    <button class="save-btn" id="n-perm-propose-btn">Enviar pedido de permuta</button>
+    <div class="status" id="n-perm-status"></div>
+  </div>
+  <div class="roster-card" id="n-tipo-card">
+    <label style="margin-top:0;">Trocar o tipo dos meus dias (ORD ⇄ RAS)</label>
+    <p style="font-size:11px;color:var(--muted);margin:0 0 8px;">Você continua nos mesmos dias; só inverte a marcação de um dia ORD com a de um dia RAS. Quem decide é o admin.</p>
+    <label>Dia que hoje é ORD (passa a RAS)</label>
+    <select id="n-tipo-ord-select"></select>
+    <label>Dia que hoje é RAS (passa a ORD)</label>
+    <select id="n-tipo-ras-select"></select>
+    <div id="n-tipo-preview" style="font-size:12px;color:var(--muted);margin-top:8px;"></div>
+    <button class="save-btn" id="n-tipo-propose-btn">Enviar pedido de troca de tipo</button>
+    <div class="status" id="n-tipo-status"></div>
+  </div>
 
   <div class="schedule-wrap" id="n-swap-incoming-wrap" style="margin-top:16px;">
     <div class="schedule-title">PEDIDOS PARA EU RESPONDER</div>
@@ -2002,13 +2025,13 @@ async function backendSendDailyReportNow(date, recipients, password){
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
 }
-async function backendNotifySwapApproved(setor, groupLabel, month, day, fromName, toName){
+async function backendNotifySwapApproved(setor, groupLabel, month, day, fromName, toName, dayB, kind){
   // Best effort: se falhar, não deve travar a troca (que já foi aprovada e gravada antes desta chamada).
   try{
     const res = await fetch(BACKEND_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action:"notify_swap_approved", secret: BACKEND_SECRET, setor, groupLabel, month, day, fromName, toName })
+      body: JSON.stringify({ action:"notify_swap_approved", secret: BACKEND_SECRET, setor, groupLabel, month, day, dayB, kind, fromName, toName })
     });
     return await res.json();
   }catch(e){
@@ -2020,12 +2043,12 @@ async function backendNotifySwapApproved(setor, groupLabel, month, day, fromName
 // "aguardando_admin") — avisa por e-mail o admin daquele setor que há uma
 // troca esperando aprovação. Best effort, mesmo padrão de
 // backendNotifySwapApproved: não trava a troca se o e-mail falhar.
-async function backendNotifySwapPendingAdmin(setor, groupLabel, month, day, fromName, toName){
+async function backendNotifySwapPendingAdmin(setor, groupLabel, month, day, fromName, toName, dayB, kind){
   try{
     const res = await fetch(BACKEND_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action:"notify_swap_pending_admin", secret: BACKEND_SECRET, setor, groupLabel, month, day, fromName, toName })
+      body: JSON.stringify({ action:"notify_swap_pending_admin", secret: BACKEND_SECRET, setor, groupLabel, month, day, dayB, kind, fromName, toName })
     });
     return await res.json();
   }catch(e){
@@ -2152,8 +2175,14 @@ const SWAP_STATUS_LABELS_ = {
 function swapRowHtml_(req, buttonsHtml){
   return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;">
     <div style="font-size:13px;color:#1e293b;">
-      Dia <strong>${req.day}</strong>: <strong>${req.fromName}</strong> → <strong>${req.toName}</strong>
+      ${req.kind === 'permuta'
+        ? `🔁 Permuta — Dia <strong>${req.day}</strong> (<strong>${req.fromName}</strong>${req.fromOrd == null ? '' : ', ' + (req.fromOrd ? 'ORD' : 'RAS')}) ⇄ Dia <strong>${req.dayB}</strong> (<strong>${req.toName}</strong>${req.toOrd == null ? '' : ', ' + (req.toOrd ? 'ORD' : 'RAS')})`
+        : req.kind === 'troca_tipo'
+        ? `🔀 Troca de tipo — <strong>${req.fromName}</strong>: Dia <strong>${req.day}</strong> (ORD → RAS) · Dia <strong>${req.dayB}</strong> (RAS → ORD)`
+        : `Dia <strong>${req.day}</strong>: <strong>${req.fromName}</strong> → <strong>${req.toName}</strong>`}
       <div style="font-size:11px;color:#64748b;">${SWAP_STATUS_LABELS_[req.status] || req.status}</div>
+      ${req._info ? `<div style="font-size:11px;color:#475569;">${req._info}</div>` : ''}
+      ${req._warn ? `<div style="font-size:11px;color:#b45309;">⚠️ ${req._warn}</div>` : ''}
     </div>
     <div style="display:flex;gap:8px;flex:none;">${buttonsHtml || ''}</div>
   </div>`;
@@ -2235,6 +2264,11 @@ function swappedNamesByDay_(swaps){
     const day = Number(r.day);
     if(!byDay[day]) byDay[day] = new Set();
     byDay[day].add(r.toName);
+    if(r.kind === 'permuta' || r.kind === 'troca_tipo'){
+      const dayB = Number(r.dayB);
+      if(!byDay[dayB]) byDay[dayB] = new Set();
+      byDay[dayB].add(r.fromName);
+    }
   });
   return byDay;
 }
@@ -2259,6 +2293,13 @@ function swapDateLabel_(month, day){
 // quem entra) — mostrar os dois com o mesmo rótulo dava a entender errado
 // que a marcação de quem saiu não tinha mudado.
 function swapCopyLine_(groupLabel, month, req){
+  if(req.kind === 'permuta'){
+    const tag = (isOrd)=> isOrd == null ? '' : ` (${isOrd ? 'ORD' : 'RAS'})`;
+    return `*${groupLabel}* — Permuta\n${swapDateLabel_(month, req.day)} — Sai: ${req.fromName}${tag(req.fromOrd)} · Entra: ${req.toName}${tag(req.toOrd)}\n${swapDateLabel_(month, req.dayB)} — Sai: ${req.toName}${tag(req.toOrd)} · Entra: ${req.fromName}${tag(req.fromOrd)}`;
+  }
+  if(req.kind === 'troca_tipo'){
+    return `*${groupLabel}* — Troca de tipo (${req.fromName})\n${swapDateLabel_(month, req.day)}: ORD → RAS\n${swapDateLabel_(month, req.dayB)}: RAS → ORD`;
+  }
   const dateLabel = swapDateLabel_(month, req.day);
   const fromSuffix = req.typeLabel ? ` (${req.fromOrd ? 'ORD' : 'RAS'})` : '';
   const toSuffix = req.typeLabel ? ` (${req.typeLabel})` : '';
@@ -7205,8 +7246,21 @@ async function loadNSwapsPanel(month){
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('n-swap-month-select', K_N_MONTHLIST, month, (m)=> loadNSwapsPanel(m));
-  const { roster, assignments, swaps } = await getNBundle_(month);
+  const { roster, assignments, swaps, dayTypes } = await getNBundle_(month);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
+  nPermutaSetup_(month, roster, assignments, dayTypes);
+  nTipoSetup_(month, assignments, dayTypes);
+  // Aviso de ORD em dia vermelho / vaga que mudou, só pra exibir ao admin (não é gravado).
+  swaps.forEach(r=>{
+    if(r.kind === 'permuta' && (r.status === 'aguardando_admin' || r.status === 'aguardando_destino')){
+      r._warn = nPermutaWarn_(r, assignments, dayTypes, month);
+    }
+    if(r.kind === 'troca_tipo' && r.status === 'aguardando_admin'){
+      const t = nTipoInfo_(r, assignments, dayTypes, month);
+      r._warn = t.warn;
+      r._info = t.info;
+    }
+  });
 
   document.getElementById('n-swap-propose-card').style.display = (isAdmin || isSupervisor || !isCurrentMonth) ? 'none' : 'block';
   if(!isAdmin && !isSupervisor && isCurrentMonth){
@@ -7326,7 +7380,7 @@ async function nSwapRespond_(id, accept){
   req.respondedAt = new Date().toISOString();
   await setNSwaps(month, list);
   logEvent('preenchimento', currentUserName, (accept ? 'Aceitou' : 'Recusou') + ' a troca do dia ' + req.day + ' proposta por ' + req.fromName + ' (NIIAD)');
-  if(accept) backendNotifySwapPendingAdmin('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName);
+  if(accept) backendNotifySwapPendingAdmin('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName, req.dayB);
   await loadNSwapsPanel(month);
 }
 
@@ -7350,7 +7404,15 @@ async function nSwapDecide_(id, approve){
   const list = await getNSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadNSwapsPanel(month); return; }
-  if(approve){
+  if(approve && req.kind === 'troca_tipo'){
+    await ensureOriginalSchedule_('niiad', month);
+    const outcome = await nTipoApprove_(req, month);
+    if(outcome === null) return; // admin desistiu — pedido continua aguardando decisão
+  } else if(approve && req.kind === 'permuta'){
+    await ensureOriginalSchedule_('niiad', month);
+    const outcome = await nPermutaApprove_(req, month);
+    if(outcome === null) return; // admin desistiu — pedido continua aguardando decisão
+  } else if(approve){
     await ensureOriginalSchedule_('niiad', month);
     const assignments = await getNAssignments(month);
     const slots = assignments[req.day] || [];
@@ -7392,11 +7454,341 @@ async function nSwapDecide_(id, approve){
   await renderNCalendarList().catch(()=>{});
 }
 
+/* ---------- NIIAD: Permuta (dois dias trocam de dono, cada um mantém o seu tipo ORD/RAS) ----------
+   Pedido: { kind:'permuta', day (dia de quem propõe), dayB (dia de quem recebe),
+   fromName (quem propõe), toName (outra pessoa), fromOrd/toOrd (tipo que cada um
+   tem no próprio dia) } — mesmo fluxo de status das trocas comuns:
+   aguardando_destino → aguardando_admin → aprovada. Na aprovação as duas vagas
+   mudam juntas ou nenhuma muda. O tipo acompanha a PESSOA: quem passa a ocupar
+   o dia do outro continua ORD ou RAS como já era. */
+function nTypeTag_(isOrd){ return isOrd ? 'ORD' : 'RAS'; }
+
+// Há, ao lado de `day`, outro dia RAS (vaga sem ord) dessa mesma pessoa?
+// `ignoreDay` é o dia que ela está deixando na permuta (já não conta).
+function nHasAdjacentRas_(assignments, name, day, ignoreDay){
+  return [day - 1, day + 1].some(d=>{
+    if(d === ignoreDay) return false;
+    return (assignments[String(d)] || []).some(raw=>{
+      const s = nNormalizeSlot_(raw);
+      return s && s.name === name && !s.ord;
+    });
+  });
+}
+
+// Valida uma permuta e devolve {ok, reason, tA, tB, warns}. Só RAS não pode
+// ficar em dias consecutivos (ORD pode ficar ao lado de qualquer coisa);
+// ORD em dia vermelho passa, mas vira aviso pro admin.
+function nPermutaCheck_(assignments, dayTypes, month, nameA, dayX, nameB, dayY, opts){
+  opts = opts || {};
+  dayX = Number(dayX); dayY = Number(dayY);
+  if(!dayX || !dayY) return { ok:false, reason:'escolha os dois dias' };
+  if(dayX === dayY) return { ok:false, reason:'os dois dias são o mesmo' };
+  if(nameA === nameB) return { ok:false, reason:'escolha outra pessoa' };
+  const slotsX = assignments[String(dayX)] || [];
+  const slotsY = assignments[String(dayY)] || [];
+  const sA = slotsX.map(nNormalizeSlot_).find(s=> s && s.name === nameA);
+  const sB = slotsY.map(nNormalizeSlot_).find(s=> s && s.name === nameB);
+  if(!sA) return { ok:false, reason: nameA + ' não está mais no dia ' + dayX };
+  if(!sB) return { ok:false, reason: nameB + ' não está mais no dia ' + dayY };
+  if(nSlotNames_(slotsY).includes(nameA)) return { ok:false, reason: nameA + ' já está no dia ' + dayY };
+  if(nSlotNames_(slotsX).includes(nameB)) return { ok:false, reason: nameB + ' já está no dia ' + dayX };
+  const tA = !!sA.ord, tB = !!sB.ord; // cada um mantém o próprio tipo
+  if(!opts.skipConsecutive){
+    if(!tA && nHasAdjacentRas_(assignments, nameA, dayY, dayX)) return { ok:false, reason:'RAS em dias consecutivos para ' + nameA };
+    if(!tB && nHasAdjacentRas_(assignments, nameB, dayX, dayY)) return { ok:false, reason:'RAS em dias consecutivos para ' + nameB };
+  }
+  const warns = [];
+  if(tA && nDayType(dayTypes, month, dayY) === 'vermelho') warns.push(nameA + ' ficaria com Ordinário (ORD) no dia ' + dayY + ', que é vermelho.');
+  if(tB && nDayType(dayTypes, month, dayX) === 'vermelho') warns.push(nameB + ' ficaria com Ordinário (ORD) no dia ' + dayX + ', que é vermelho.');
+  return { ok:true, tA, tB, warns };
+}
+
+// Aviso mostrado ao admin na lista de pendentes (ver loadNSwapsPanel).
+function nPermutaWarn_(req, assignments, dayTypes, month){
+  const chk = nPermutaCheck_(assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB, { skipConsecutive:true });
+  if(!chk.ok) return 'Esta permuta não pode mais ser aplicada: ' + chk.reason + '.';
+  return chk.warns.join(' ');
+}
+
+function nPermutaSetup_(month, roster, assignments, dayTypes){
+  const card = document.getElementById('n-perm-card');
+  if(!card) return;
+  const isCurrentMonth = month === currentMonthISO_();
+  if(currentRole === 'admin' || currentRole === 'supervisor' || !isCurrentMonth){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const me = currentUserName;
+  const daySel = document.getElementById('n-perm-day-select');
+  const targetSel = document.getElementById('n-perm-target-select');
+  const theirSel = document.getElementById('n-perm-theirday-select');
+  const previewEl = document.getElementById('n-perm-preview');
+  const statusEl = document.getElementById('n-perm-status');
+  const dayLabel = (d, name)=>{
+    const s = (assignments[String(d)] || []).map(nNormalizeSlot_).find(x=> x && x.name === name);
+    return 'Dia ' + d + ' (' + weekdayAbbrev(month, d) + ') — ' + nTypeTag_(s && s.ord);
+  };
+  const daysOf = (name)=> Object.keys(assignments)
+    .filter(d=> nSlotNames_(assignments[d]).includes(name))
+    .map(Number).sort((a,b)=> a - b);
+
+  const myDays = daysOf(me);
+  daySel.innerHTML = myDays.length
+    ? myDays.map(d=> `<option value="${d}">${dayLabel(d, me)}</option>`).join('')
+    : '<option value="">-- você não tem dias assumidos neste mês --</option>';
+  targetSel.innerHTML = '<option value="">-- selecione --</option>' +
+    sortByRank_(roster).filter(p=> p.name !== me).map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
+
+  const refreshTheirDays = ()=>{
+    const B = targetSel.value;
+    const X = daySel.value;
+    previewEl.textContent = '';
+    if(!B){ theirSel.innerHTML = '<option value="">-- escolha primeiro a pessoa --</option>'; return; }
+    const theirDays = daysOf(B);
+    if(!theirDays.length){ theirSel.innerHTML = '<option value="">-- essa pessoa não tem dias neste mês --</option>'; return; }
+    theirSel.innerHTML = '<option value="">-- selecione --</option>' + theirDays.map(d=>{
+      const chk = nPermutaCheck_(assignments, dayTypes, month, me, X, B, d);
+      if(!chk.ok) return `<option value="${d}" disabled>${dayLabel(d, B)} — indisponível: ${origEsc_(chk.reason)}</option>`;
+      return `<option value="${d}">${dayLabel(d, B)}${chk.warns.length ? ' ⚠️' : ''}</option>`;
+    }).join('');
+  };
+  const refreshPreview = ()=>{
+    const B = targetSel.value, X = daySel.value, Y = theirSel.value;
+    if(!B || !X || !Y){ previewEl.textContent = ''; return; }
+    const chk = nPermutaCheck_(assignments, dayTypes, month, me, X, B, Y);
+    if(!chk.ok){ previewEl.style.color = '#f87171'; previewEl.textContent = 'Não é possível: ' + chk.reason + '.'; return; }
+    previewEl.style.color = 'var(--muted)';
+    previewEl.innerHTML = 'Você passa o dia <strong>' + X + '</strong> (' + nTypeTag_(chk.tA) + ') para ' + origEsc_(B) +
+      ' e assume o dia <strong>' + Y + '</strong>, mantendo ' + nTypeTag_(chk.tA) + '. ' + origEsc_(B) + ' fica com o dia ' + X + ' como ' + nTypeTag_(chk.tB) + '.' +
+      (chk.warns.length ? '<br><span style="color:#fbbf24;">⚠️ ' + chk.warns.map(origEsc_).join(' ') + ' O admin será avisado.</span>' : '');
+  };
+  daySel.onchange = ()=>{ refreshTheirDays(); };
+  targetSel.onchange = ()=>{ refreshTheirDays(); };
+  theirSel.onchange = refreshPreview;
+  refreshTheirDays();
+
+  document.getElementById('n-perm-propose-btn').onclick = async ()=>{
+    const B = targetSel.value, X = daySel.value, Y = theirSel.value;
+    if(!X || !B || !Y){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha seu dia, a pessoa e o dia dela.'; return; }
+    // Revalida com os dados mais recentes antes de gravar.
+    const [freshAssign, freshTypes] = await Promise.all([getNAssignments(month), getNDayTypes(month)]);
+    const chk = nPermutaCheck_(freshAssign, freshTypes, month, me, X, B, Y);
+    if(!chk.ok){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Não é possível propor: ' + chk.reason + '.'; return; }
+    const fresh = await getNSwaps(month);
+    fresh.push({ id: newSwapId_(), kind:'permuta', day: X, dayB: Y, fromName: me, toName: B, fromOrd: chk.tA, toOrd: chk.tB,
+      status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
+    await setNSwaps(month, fresh);
+    logEvent('preenchimento', me, 'Propôs permuta do dia ' + X + ' pelo dia ' + Y + ' de ' + B + ' (NIIAD)');
+    statusEl.style.color = '#22c55e';
+    statusEl.textContent = 'Pedido de permuta enviado.';
+    await loadNSwapsPanel(month);
+  };
+}
+
+// Aprovação do admin. Devolve null se o admin desistiu (nada alterado), senão
+// atualiza req.status ('aprovada' ou 'erro_ao_aplicar') — quem chama grava a lista.
+async function nPermutaApprove_(req, month){
+  const dayTypes = await getNDayTypes(month);
+  let assignments = await getNAssignments(month);
+  let chk = nPermutaCheck_(assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB, { skipConsecutive:true });
+  if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+  if(chk.warns.length){
+    const ok = await askConfirm('⚠️ Atenção:\n' + chk.warns.join('\n') + '\nAprovar a permuta mesmo assim?');
+    if(!ok) return null;
+    // Relê após a pergunta pra não gravar por cima de mudanças feitas enquanto ela estava aberta.
+    assignments = await getNAssignments(month);
+    chk = nPermutaCheck_(assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB, { skipConsecutive:true });
+    if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+  }
+  const slotsX = assignments[String(req.day)] || [];
+  const slotsY = assignments[String(req.dayB)] || [];
+  const iA = slotsX.findIndex(raw=> nSlotName_(raw) === req.fromName);
+  const iB = slotsY.findIndex(raw=> nSlotName_(raw) === req.toName);
+  const before = 'dia ' + req.day + ': ' + nSlotNames_(slotsX).join(', ') + ' | dia ' + req.dayB + ': ' + nSlotNames_(slotsY).join(', ');
+  slotsX[iA] = { name: req.toName, ord: chk.tB };   // quem recebe o dia X mantém o tipo que já tinha
+  slotsY[iB] = { name: req.fromName, ord: chk.tA }; // quem propôs mantém o tipo no dia Y
+  assignments[String(req.day)] = slotsX;
+  assignments[String(req.dayB)] = slotsY;
+  await setNAssignments(month, assignments);
+  req.status = 'aprovada';
+  req.fromOrd = chk.tA;
+  req.toOrd = chk.tB;
+  logEvent('admin', adminActorLabel_(), 'Aprovou permuta (NIIAD) — ' + before + ' → dia ' + req.day + ': ' + nSlotNames_(slotsX).join(', ') + ' | dia ' + req.dayB + ': ' + nSlotNames_(slotsY).join(', '));
+  backendNotifySwapApproved('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName, req.dayB);
+  return 'ok';
+}
+
+async function nPermutaUndo_(req, list, month){
+  const confirmed = await askConfirm('Desfazer esta permuta? O dia ' + req.day + ' volta a ficar com ' + req.fromName + ' e o dia ' + req.dayB + ' com ' + req.toName + '.');
+  if(!confirmed) return;
+  const assignments = await getNAssignments(month);
+  const slotsX = assignments[String(req.day)] || [];
+  const slotsY = assignments[String(req.dayB)] || [];
+  const iB = slotsX.findIndex(raw=> nSlotName_(raw) === req.toName);
+  const iA = slotsY.findIndex(raw=> nSlotName_(raw) === req.fromName);
+  if(iB === -1 || iA === -1 || nSlotNames_(slotsX).includes(req.fromName) || nSlotNames_(slotsY).includes(req.toName)){
+    alert('Não deu pra desfazer automaticamente: uma das vagas já mudou depois da permuta. Ajuste manualmente em "Configurar NIIAD" se precisar.');
+    return;
+  }
+  slotsX[iB] = { name: req.fromName, ord: !!req.fromOrd };
+  slotsY[iA] = { name: req.toName, ord: !!req.toOrd };
+  assignments[String(req.day)] = slotsX;
+  assignments[String(req.dayB)] = slotsY;
+  await setNAssignments(month, assignments);
+  req.status = 'desfeita';
+  req.undoneAt = new Date().toISOString();
+  await setNSwaps(month, list);
+  logEvent('admin', adminActorLabel_(), 'Desfez permuta (NIIAD) — dias ' + req.day + ' e ' + req.dayB + ' (' + req.fromName + ' ⇄ ' + req.toName + ')');
+  await loadNSwapsPanel(month);
+  const isCM = month === currentMonthISO_();
+  await renderNCalendarList(null, {idPrefix: isCM ? 'n' : 'n-pick-next', month}).catch(()=>{});
+}
+
+/* ---------- NIIAD: Troca de tipo dos próprios dias (ORD ⇄ RAS) ----------
+   Pedido: { kind:'troca_tipo', fromName = toName = a própria pessoa, day (dia hoje ORD,
+   passa a RAS), dayB (dia hoje RAS, passa a ORD) }. Só a própria pessoa propõe e só o
+   admin decide (sem aceite de terceiros). Os dois dias continuam com ela — só a
+   marcação ORD/RAS de cada um é invertida, então o total de ORD dela não muda;
+   o que muda é a distribuição de preto/vermelho (a tela mostra o efeito). */
+function nCountsText_(c){ return 'Preto ' + c.preto + ', Vermelho ' + c.vermelho; }
+
+function nTipoCheck_(assignments, dayTypes, month, name, dayOrd, dayRas){
+  dayOrd = Number(dayOrd); dayRas = Number(dayRas);
+  if(!dayOrd || !dayRas) return { ok:false, reason:'escolha os dois dias' };
+  const sO = (assignments[String(dayOrd)] || []).map(nNormalizeSlot_).find(s=> s && s.name === name);
+  const sR = (assignments[String(dayRas)] || []).map(nNormalizeSlot_).find(s=> s && s.name === name);
+  if(!sO || !sO.ord) return { ok:false, reason:'o dia ' + dayOrd + ' não é mais ORD de ' + name };
+  if(!sR || sR.ord) return { ok:false, reason:'o dia ' + dayRas + ' não é mais RAS de ' + name };
+  // O dia ORD vira RAS: não pode ficar ao lado de outro RAS da mesma pessoa
+  // (o outro dia da troca vira ORD, então não conta).
+  if(nHasAdjacentRas_(assignments, name, dayOrd, dayRas)) return { ok:false, reason:'o dia ' + dayOrd + ' viraria RAS ao lado de outro dia RAS' };
+  const warns = [];
+  if(nDayType(dayTypes, month, dayRas) === 'vermelho') warns.push('O dia ' + dayRas + ' é vermelho e passaria a contar como Ordinário (ORD).');
+  // Efeito nas cotas: simula a inversão.
+  const after = JSON.parse(JSON.stringify(assignments));
+  (after[String(dayOrd)] || []).forEach((raw, i)=>{ const s = nNormalizeSlot_(raw); if(s && s.name === name) after[String(dayOrd)][i] = { name, ord:false }; });
+  (after[String(dayRas)] || []).forEach((raw, i)=>{ const s = nNormalizeSlot_(raw); if(s && s.name === name) after[String(dayRas)][i] = { name, ord:true }; });
+  const before = nCountsFor_(name, assignments, dayTypes, month);
+  const post = nCountsFor_(name, after, dayTypes, month);
+  return { ok:true, warns, effect: nCountsText_(before) + ' → ' + nCountsText_(post) };
+}
+
+function nTipoInfo_(req, assignments, dayTypes, month){
+  const chk = nTipoCheck_(assignments, dayTypes, month, req.fromName, req.day, req.dayB);
+  if(!chk.ok) return { warn: 'Este pedido não pode mais ser aplicado: ' + chk.reason + '.', info: '' };
+  return { warn: chk.warns.join(' '), info: 'Efeito nas cotas de ' + req.fromName + ': ' + chk.effect + '.' };
+}
+
+function nTipoSetup_(month, assignments, dayTypes){
+  const card = document.getElementById('n-tipo-card');
+  if(!card) return;
+  if(currentRole === 'admin' || currentRole === 'supervisor' || month !== currentMonthISO_()){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  const me = currentUserName;
+  const ordSel = document.getElementById('n-tipo-ord-select');
+  const rasSel = document.getElementById('n-tipo-ras-select');
+  const previewEl = document.getElementById('n-tipo-preview');
+  const statusEl = document.getElementById('n-tipo-status');
+  const mySlots = [];
+  Object.keys(assignments).forEach(d=>{
+    const s = (assignments[d] || []).map(nNormalizeSlot_).find(x=> x && x.name === me);
+    if(s) mySlots.push({ day: Number(d), ord: !!s.ord });
+  });
+  mySlots.sort((a,b)=> a.day - b.day);
+  const label = (x)=> 'Dia ' + x.day + ' (' + weekdayAbbrev(month, x.day) + ', ' + nDayType(dayTypes, month, x.day) + ')';
+  const ords = mySlots.filter(x=> x.ord), rases = mySlots.filter(x=> !x.ord);
+  ordSel.innerHTML = ords.length ? ords.map(x=> `<option value="${x.day}">${label(x)}</option>`).join('') : '<option value="">-- você não tem dia ORD --</option>';
+  rasSel.innerHTML = rases.length ? rases.map(x=> `<option value="${x.day}">${label(x)}</option>`).join('') : '<option value="">-- você não tem dia RAS --</option>';
+  const refresh = ()=>{
+    const O = ordSel.value, R = rasSel.value;
+    if(!O || !R){ previewEl.textContent = ''; return; }
+    const chk = nTipoCheck_(assignments, dayTypes, month, me, O, R);
+    if(!chk.ok){ previewEl.style.color = '#f87171'; previewEl.textContent = 'Não é possível: ' + chk.reason + '.'; return; }
+    previewEl.style.color = 'var(--muted)';
+    previewEl.innerHTML = 'Dia <strong>' + O + '</strong>: ORD → RAS · Dia <strong>' + R + '</strong>: RAS → ORD.<br>Efeito nas suas cotas: ' + chk.effect + '.' +
+      (chk.warns.length ? '<br><span style="color:#fbbf24;">⚠️ ' + chk.warns.map(origEsc_).join(' ') + ' O admin será avisado.</span>' : '');
+  };
+  ordSel.onchange = refresh; rasSel.onchange = refresh;
+  refresh();
+
+  document.getElementById('n-tipo-propose-btn').onclick = async ()=>{
+    const O = ordSel.value, R = rasSel.value;
+    if(!O || !R){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Você precisa de um dia ORD e um dia RAS.'; return; }
+    const [freshAssign, freshTypes] = await Promise.all([getNAssignments(month), getNDayTypes(month)]);
+    const chk = nTipoCheck_(freshAssign, freshTypes, month, me, O, R);
+    if(!chk.ok){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Não é possível propor: ' + chk.reason + '.'; return; }
+    const fresh = await getNSwaps(month);
+    fresh.push({ id: newSwapId_(), kind:'troca_tipo', day: O, dayB: R, fromName: me, toName: me,
+      status: 'aguardando_admin', createdAt: new Date().toISOString(), respondedAt: new Date().toISOString(), month });
+    await setNSwaps(month, fresh);
+    logEvent('preenchimento', me, 'Propôs troca de tipo: dia ' + O + ' ORD → RAS e dia ' + R + ' RAS → ORD (NIIAD)');
+    backendNotifySwapPendingAdmin('niiad', 'NIIAD', month, O, me, me, R, 'troca_tipo');
+    statusEl.style.color = '#22c55e';
+    statusEl.textContent = 'Pedido enviado para aprovação do admin.';
+    await loadNSwapsPanel(month);
+  };
+}
+
+// Aprovação (admin). Devolve null se o admin desistiu; senão define req.status.
+async function nTipoApprove_(req, month){
+  const dayTypes = await getNDayTypes(month);
+  let assignments = await getNAssignments(month);
+  let chk = nTipoCheck_(assignments, dayTypes, month, req.fromName, req.day, req.dayB);
+  if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+  if(chk.warns.length){
+    const ok = await askConfirm('⚠️ Atenção:\n' + chk.warns.join('\n') + '\nAprovar a troca de tipo mesmo assim?');
+    if(!ok) return null;
+    assignments = await getNAssignments(month); // relê: nada pode ter sido sobrescrito enquanto a pergunta estava aberta
+    chk = nTipoCheck_(assignments, dayTypes, month, req.fromName, req.day, req.dayB);
+    if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+  }
+  const setOrd = (day, isOrd)=>{
+    const slots = assignments[String(day)] || [];
+    const i = slots.findIndex(raw=> nSlotName_(raw) === req.fromName);
+    slots[i] = { name: req.fromName, ord: isOrd };
+    assignments[String(day)] = slots;
+  };
+  setOrd(req.day, false);
+  setOrd(req.dayB, true);
+  await setNAssignments(month, assignments);
+  req.status = 'aprovada';
+  logEvent('admin', adminActorLabel_(), 'Aprovou troca de tipo (NIIAD) — ' + req.fromName + ': dia ' + req.day + ' ORD → RAS, dia ' + req.dayB + ' RAS → ORD (' + chk.effect + ')');
+  backendNotifySwapApproved('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName, req.dayB, 'troca_tipo');
+  return 'ok';
+}
+
+async function nTipoUndo_(req, list, month){
+  const confirmed = await askConfirm('Desfazer esta troca de tipo? O dia ' + req.day + ' volta a ser ORD e o dia ' + req.dayB + ' volta a ser RAS para ' + req.fromName + '.');
+  if(!confirmed) return;
+  const assignments = await getNAssignments(month);
+  const find = (day)=>{
+    const slots = assignments[String(day)] || [];
+    return { slots, i: slots.findIndex(raw=> nSlotName_(raw) === req.fromName) };
+  };
+  const a = find(req.day), b = find(req.dayB);
+  if(a.i === -1 || b.i === -1 || nNormalizeSlot_(a.slots[a.i]).ord || !nNormalizeSlot_(b.slots[b.i]).ord){
+    alert('Não deu pra desfazer automaticamente: as vagas já mudaram depois da troca de tipo. Ajuste manualmente em "Configurar NIIAD" se precisar.');
+    return;
+  }
+  a.slots[a.i] = { name: req.fromName, ord: true };
+  b.slots[b.i] = { name: req.fromName, ord: false };
+  assignments[String(req.day)] = a.slots;
+  assignments[String(req.dayB)] = b.slots;
+  await setNAssignments(month, assignments);
+  req.status = 'desfeita';
+  req.undoneAt = new Date().toISOString();
+  await setNSwaps(month, list);
+  logEvent('admin', adminActorLabel_(), 'Desfez troca de tipo (NIIAD) — ' + req.fromName + ', dias ' + req.day + ' e ' + req.dayB);
+  await loadNSwapsPanel(month);
+  const isCM = month === currentMonthISO_();
+  await renderNCalendarList(null, {idPrefix: isCM ? 'n' : 'n-pick-next', month}).catch(()=>{});
+}
+
 async function nSwapUndo_(id, month){
   month = month || currentMonthISO_();
   const list = await getNSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aprovada') { await loadNSwapsPanel(month); return; }
+  if(req.kind === 'permuta'){ await nPermutaUndo_(req, list, month); return; }
+  if(req.kind === 'troca_tipo'){ await nTipoUndo_(req, list, month); return; }
   const confirmed = await askConfirm('Desfazer esta troca? O dia ' + req.day + ' volta a ficar com ' + req.fromName + '.');
   if(!confirmed) return;
   const assignments = await getNAssignments(month);
@@ -8425,10 +8817,20 @@ async function renderOriginais_(setor){
     // Eventos de troca por dia, em ordem cronológica: aplicação (aprovada /
     // direta do admin) e, quando houve, o desfazer.
     const events = [];
-    swapList.forEach(s=>{
-      if(s.status !== 'aprovada' && s.status !== 'desfeita') return;
-      events.push({ t: s.decidedAt || s.respondedAt || s.createdAt || '', kind:'apply', s });
-      if(s.status === 'desfeita' && s.undoneAt) events.push({ t: s.undoneAt, kind:'undo', s });
+    // Permuta = dois movimentos (um em cada dia), cada um com o tipo de quem entra.
+    const expandSwap = (s)=> s.kind === 'troca_tipo'
+      ? [ Object.assign({}, s, { viaTipo:true, tipoDe:'ORD', tipoPara:'RAS' }),
+          Object.assign({}, s, { day: s.dayB, viaTipo:true, tipoDe:'RAS', tipoPara:'ORD' }) ]
+      : s.kind === 'permuta'
+      ? [ Object.assign({}, s, { typeLabel: s.toOrd == null ? undefined : (s.toOrd ? 'ORD' : 'RAS'), viaPermuta: true }),
+          Object.assign({}, s, { day: s.dayB, fromName: s.toName, toName: s.fromName, typeLabel: s.fromOrd == null ? undefined : (s.fromOrd ? 'ORD' : 'RAS'), viaPermuta: true }) ]
+      : [ s ];
+    swapList.forEach(s0=>{
+      if(s0.status !== 'aprovada' && s0.status !== 'desfeita') return;
+      expandSwap(s0).forEach(s=>{
+        events.push({ t: s0.decidedAt || s0.respondedAt || s0.createdAt || '', kind:'apply', s });
+        if(s0.status === 'desfeita' && s0.undoneAt) events.push({ t: s0.undoneAt, kind:'undo', s });
+      });
     });
     events.sort((a,b)=> String(a.t).localeCompare(String(b.t)));
     const byDay = {};
@@ -8462,7 +8864,8 @@ async function renderOriginais_(setor){
         }
       });
       const same = (a, b)=> a.slice().sort().join('|') === b.slice().sort().join('|');
-      const changed = !same(oNames, cNames);
+      const sig = (slots)=> (slots || []).map(origSlotInfo_).filter(x=> x.name).map(x=> x.name + (x.ord ? '*' : '')).sort().join('|');
+      const changed = sig(oSlots) !== sig(cSlots);
       const divergent = !same(sim, cNames);
       if(changed) changedDays++;
       if(divergent) divergentDays++;
@@ -8471,7 +8874,12 @@ async function renderOriginais_(setor){
       const pathHtml = evs.length ? evs.map(ev=>{
         const s = ev.s;
         const tag = s.typeLabel ? ` <span class="orig-tag">${origEsc_(s.typeLabel)}</span>` : '';
-        const direct = s.appliedDirectlyByAdmin ? ' <span class="orig-tag orig-tag-admin">direta do admin</span>' : '';
+        const direct = (s.appliedDirectlyByAdmin ? ' <span class="orig-tag orig-tag-admin">direta do admin</span>' : '') + (s.viaPermuta ? ' <span class="orig-tag">permuta</span>' : '');
+        if(s.viaTipo){
+          return ev.kind === 'undo'
+            ? `<div class="orig-step orig-step-undo">↩️ tipo restaurado: ${origEsc_(s.fromName)} ${s.tipoPara} → ${s.tipoDe} <span class="orig-time">${origFmtTime_(ev.t)}</span></div>`
+            : `<div class="orig-step">🔀 ${origEsc_(s.fromName)}: <strong>${s.tipoDe} → ${s.tipoPara}</strong> <span class="orig-tag">troca de tipo</span> <span class="orig-time">${origFmtTime_(ev.t)}</span></div>`;
+        }
         if(ev.kind === 'undo'){
           return `<div class="orig-step orig-step-undo">↩️ desfeita: ${origEsc_(s.toName)} → ${origEsc_(s.fromName)} <span class="orig-time">${origFmtTime_(ev.t)}</span></div>`;
         }
@@ -8495,7 +8903,7 @@ async function renderOriginais_(setor){
     }).join('');
 
     resultEl.innerHTML = `
-      <div class="count-badge" style="margin-top:12px;">${changedDays} dia(s) com vaga diferente da original · ${events.filter(e=> e.kind === 'apply').length} troca(s) aplicada(s)${divergentDays ? ' · ⚠️ ' + divergentDays + ' dia(s) com divergência' : ''}</div>
+      <div class="count-badge" style="margin-top:12px;">${changedDays} dia(s) com vaga diferente da original · ${new Set(events.filter(e=> e.kind === 'apply').map(e=> e.s.id)).size} troca(s) aplicada(s)${divergentDays ? ' · ⚠️ ' + divergentDays + ' dia(s) com divergência' : ''}</div>
       <div class="orig-wrap">
         <table class="orig-table">
           <thead><tr><th>Dia</th><th>Original</th><th>Caminho das permutas</th><th>Atual</th></tr></thead>
