@@ -1453,16 +1453,9 @@
     <select id="n-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Fora do mês vigente, a tela vira histórico — só consulta, sem ações.</p>
   </div>
-  <div class="roster-card" id="n-swap-propose-card">
-    <label style="margin-top:0;">Propor troca de um dia meu</label>
-    <select id="n-swap-day-select"></select>
-    <label>Passar para</label>
-    <select id="n-swap-target-select"></select>
-    <button class="save-btn" id="n-swap-propose-btn">Enviar pedido de troca</button>
-    <div class="status" id="n-swap-propose-status"></div>
-  </div>
   <div class="roster-card" id="n-perm-card">
     <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
+    <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="n-perm-day-select"></select>
     <label>Permutar com</label>
     <select id="n-perm-target-select"></select>
@@ -1473,8 +1466,17 @@
     <button class="save-btn" id="n-perm-propose-btn">Enviar pedido de permuta</button>
     <div class="status" id="n-perm-status"></div>
   </div>
+  <div class="roster-card" id="n-swap-propose-card">
+    <label style="margin-top:0;">Ceder um dia meu (cessão de serviço — sem receber outro dia em troca)</label>
+    <select id="n-swap-day-select"></select>
+    <label>Passar para</label>
+    <select id="n-swap-target-select"></select>
+    <button class="save-btn" id="n-swap-propose-btn">Enviar pedido de cessão</button>
+    <div class="status" id="n-swap-propose-status"></div>
+  </div>
   <div class="roster-card" id="n-tipo-card">
     <label style="margin-top:0;">Trocar o tipo dos meus dias (ORD ⇄ RAS)</label>
+    <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <p style="font-size:11px;color:var(--muted);margin:0 0 8px;">Você continua nos mesmos dias; só inverte a marcação de um dia ORD com a de um dia RAS. Quem decide é o admin.</p>
     <label>Dia que hoje é ORD (passa a RAS)</label>
     <select id="n-tipo-ord-select"></select>
@@ -7246,10 +7248,10 @@ async function loadNSwapsPanel(month){
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('n-swap-month-select', K_N_MONTHLIST, month, (m)=> loadNSwapsPanel(m));
-  const { roster, assignments, swaps, dayTypes } = await getNBundle_(month);
+  const { roster, assignments, swaps, dayTypes, released } = await getNBundle_(month);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
-  nPermutaSetup_(month, roster, assignments, dayTypes);
-  nTipoSetup_(month, assignments, dayTypes);
+  nPermutaSetup_(month, roster, assignments, dayTypes, released);
+  nTipoSetup_(month, assignments, dayTypes, released);
   // Aviso de ORD em dia vermelho / vaga que mudou, só pra exibir ao admin (não é gravado).
   swaps.forEach(r=>{
     if(r.kind === 'permuta' && (r.status === 'aguardando_admin' || r.status === 'aguardando_destino')){
@@ -7461,6 +7463,23 @@ async function nSwapDecide_(id, approve){
    aguardando_destino → aguardando_admin → aprovada. Na aprovação as duas vagas
    mudam juntas ou nenhuma muda. O tipo acompanha a PESSOA: quem passa a ocupar
    o dia do outro continua ORD ou RAS como já era. */
+// Permuta e troca de tipo só abrem depois que o admin encerra o período de
+// escolha (preenchimento liberado = escala ainda sendo montada).
+const N_LOCK_MSG_ = '🔒 Disponível só depois que o admin encerrar o período de escolha de serviços (escala ainda em montagem).';
+function nSetCardLock_(card, locked){
+  const note = card.querySelector('.n-lock-note');
+  Array.from(card.children).forEach(el=>{
+    if(el === note || el.tagName === 'LABEL' && el === card.firstElementChild) return;
+    el.style.display = locked ? 'none' : '';
+  });
+  note.style.display = locked ? 'block' : 'none';
+  note.textContent = locked ? N_LOCK_MSG_ : '';
+}
+async function nIsReleasedFresh_(month){
+  const b = await window.storage.getBatch([monthKey_(K_N_RELEASED, month)]);
+  return parseBatchValue_(b, monthKey_(K_N_RELEASED, month), false) === true;
+}
+
 function nTypeTag_(isOrd){ return isOrd ? 'ORD' : 'RAS'; }
 
 // Há, ao lado de `day`, outro dia RAS (vaga sem ord) dessa mesma pessoa?
@@ -7510,12 +7529,14 @@ function nPermutaWarn_(req, assignments, dayTypes, month){
   return chk.warns.join(' ');
 }
 
-function nPermutaSetup_(month, roster, assignments, dayTypes){
+function nPermutaSetup_(month, roster, assignments, dayTypes, released){
   const card = document.getElementById('n-perm-card');
   if(!card) return;
   const isCurrentMonth = month === currentMonthISO_();
   if(currentRole === 'admin' || currentRole === 'supervisor' || !isCurrentMonth){ card.style.display = 'none'; return; }
   card.style.display = 'block';
+  nSetCardLock_(card, released === true);
+  if(released === true) return;
   const me = currentUserName;
   const daySel = document.getElementById('n-perm-day-select');
   const targetSel = document.getElementById('n-perm-target-select');
@@ -7568,6 +7589,7 @@ function nPermutaSetup_(month, roster, assignments, dayTypes){
   document.getElementById('n-perm-propose-btn').onclick = async ()=>{
     const B = targetSel.value, X = daySel.value, Y = theirSel.value;
     if(!X || !B || !Y){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha seu dia, a pessoa e o dia dela.'; return; }
+    if(await nIsReleasedFresh_(month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
     // Revalida com os dados mais recentes antes de gravar.
     const [freshAssign, freshTypes] = await Promise.all([getNAssignments(month), getNDayTypes(month)]);
     const chk = nPermutaCheck_(freshAssign, freshTypes, month, me, X, B, Y);
@@ -7677,11 +7699,13 @@ function nTipoInfo_(req, assignments, dayTypes, month){
   return { warn: chk.warns.join(' '), info: 'Efeito nas cotas de ' + req.fromName + ': ' + chk.effect + '.' };
 }
 
-function nTipoSetup_(month, assignments, dayTypes){
+function nTipoSetup_(month, assignments, dayTypes, released){
   const card = document.getElementById('n-tipo-card');
   if(!card) return;
   if(currentRole === 'admin' || currentRole === 'supervisor' || month !== currentMonthISO_()){ card.style.display = 'none'; return; }
   card.style.display = 'block';
+  nSetCardLock_(card, released === true);
+  if(released === true) return;
   const me = currentUserName;
   const ordSel = document.getElementById('n-tipo-ord-select');
   const rasSel = document.getElementById('n-tipo-ras-select');
@@ -7712,6 +7736,7 @@ function nTipoSetup_(month, assignments, dayTypes){
   document.getElementById('n-tipo-propose-btn').onclick = async ()=>{
     const O = ordSel.value, R = rasSel.value;
     if(!O || !R){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Você precisa de um dia ORD e um dia RAS.'; return; }
+    if(await nIsReleasedFresh_(month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
     const [freshAssign, freshTypes] = await Promise.all([getNAssignments(month), getNDayTypes(month)]);
     const chk = nTipoCheck_(freshAssign, freshTypes, month, me, O, R);
     if(!chk.ok){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Não é possível propor: ' + chk.reason + '.'; return; }
