@@ -472,6 +472,19 @@
     <div class="status" id="status"></div>
   </div>
 
+  <div class="card" id="ferias-card" style="margin-top:16px;display:none;">
+    <label style="margin-top:0;">🏖️ Férias por período (preenchimento automático)</label>
+    <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Informe a pessoa e o período. Nos dias do período a escala passa a mostrar <strong>Férias</strong> automaticamente (inclusive sábado e domingo) e a pessoa não precisa marcar nada; feriados da semana continuam sem expediente. Vale para qualquer semana e muda sozinha se você remover o período.</p>
+    <select id="ferias-name-select"></select>
+    <div style="display:flex;gap:12px;flex-wrap:wrap;">
+      <div style="flex:1;min-width:140px;"><label>Início</label><input type="date" id="ferias-start"></div>
+      <div style="flex:1;min-width:140px;"><label>Fim</label><input type="date" id="ferias-end"></div>
+    </div>
+    <button class="save-btn" id="ferias-add-btn">Adicionar período de férias</button>
+    <div class="status" id="ferias-status"></div>
+    <div id="ferias-list" style="margin-top:12px;"></div>
+  </div>
+
   <div class="card" style="margin-top:16px;">
     <label style="margin-top:0;">Prévia da escala (com as escolhas já feitas pelos demais)</label>
     <div id="preview-wrap" style="background:#ffffff;border-radius:8px;overflow:hidden;">
@@ -3113,14 +3126,15 @@ async function setActiveDays(arr){
 // disparava 4 chamadas ao backend só pra redesenhar a prévia.
 let expedienteCache_ = null;
 async function getExpedienteBundle_(){
-  const batch = await window.storage.getBatch([K_WEEK, K_RELEASED, K_ROSTER, K_CHOICES, K_ACTIVE_DAYS, K_OBS]);
+  const batch = await window.storage.getBatch([K_WEEK, K_RELEASED, K_ROSTER, K_CHOICES, K_ACTIVE_DAYS, K_OBS, K_FERIAS]);
   const bundle = {
     weekStart: parseBatchValue_(batch, K_WEEK, null),
     released: parseBatchValue_(batch, K_RELEASED, false) === true,
     roster: parseBatchValue_(batch, K_ROSTER, DEFAULT_ROSTER),
     choices: parseBatchValue_(batch, K_CHOICES, {}),
     activeDays: parseBatchValue_(batch, K_ACTIVE_DAYS, [...DAYS]),
-    obs: parseBatchValue_(batch, K_OBS, "")
+    obs: parseBatchValue_(batch, K_OBS, ""),
+    ferias: parseBatchValue_(batch, K_FERIAS, [])
   };
   expedienteCache_ = bundle;
   return bundle;
@@ -3128,7 +3142,7 @@ async function getExpedienteBundle_(){
 
 /* ---------- SUBSEGOP: aba Marcar ---------- */
 async function loadFillPanel(){
-  const { weekStart, released, roster, activeDays } = await getExpedienteBundle_();
+  const { weekStart, released, roster, activeDays, ferias } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
   const bannerEl = document.getElementById('week-banner-range');
   if(bannerEl){
@@ -3180,7 +3194,8 @@ async function loadFillPanel(){
     row.className = 'day-row' + (isActive ? '' : ' day-row-holiday') + (isWeekend ? ' day-row-weekend' : '');
     if(isActive){
       row.innerHTML = `<span class="day-label">${day}</span>
-        <div class="status-btns" data-day="${day}">${isWeekend ? WEEKEND_STATUS_BTNS : ALL_STATUS_BTNS}</div>`;
+        <div class="status-btns" data-day="${day}">${isWeekend ? WEEKEND_STATUS_BTNS : ALL_STATUS_BTNS}</div>
+        <span class="ferias-lock-tag" data-day="${day}" style="display:none;font-size:12px;font-weight:600;color:#fecdd3;">🏖️ Férias (período registrado)</span>`;
     } else {
       row.innerHTML = `<span class="day-label">${day}</span>
         <span class="holiday-tag">Sem expediente (feriado/facultativo)</span>`;
@@ -3204,9 +3219,26 @@ async function loadFillPanel(){
     };
   });
 
+  // Dias cobertos por um período de férias da pessoa escolhida: sem botões
+  // (a escala já mostra Férias) e fora do que é salvo na semana.
+  const applyFeriasLocks_ = (name)=>{
+    const lockedMap = (name && feriasMap_(ferias, dates)[name]) || {};
+    rowsWrap.querySelectorAll('.status-btns').forEach(group=>{
+      const day = group.dataset.day;
+      const locked = !!lockedMap[day];
+      group.style.display = locked ? 'none' : '';
+      const tag = rowsWrap.querySelector('.ferias-lock-tag[data-day="' + day + '"]');
+      if(tag) tag.style.display = locked ? '' : 'none';
+      if(locked){
+        currentSelection[day] = null;
+        group.querySelectorAll('.status-btn').forEach(b=> b.classList.remove('active'));
+      }
+    });
+  };
+
   select.onchange = async ()=>{
     const name = select.value;
-    if(!name) return;
+    if(!name){ applyFeriasLocks_(null); return; }
     // Busca fresco só aqui (troca de pessoa é pouco frequente, ao contrário
     // dos cliques de status) pra não mostrar dado desatualizado de alguém
     // que acabou de salvar. Atualiza o cache também.
@@ -3220,8 +3252,13 @@ async function loadFillPanel(){
       });
       currentSelection[day] = existing[day] || null;
     });
+    applyFeriasLocks_(name);
     updatePreview();
   };
+
+  renderFeriasCard_(canActAsOthers, roster, async ()=>{
+    if(select.value) await select.onchange(); else await updatePreview();
+  });
 
   if(!canActAsOthers && select.value){
     await select.onchange();
@@ -3237,7 +3274,7 @@ async function updatePreview(){
   // vez de buscar tudo de novo — updatePreview() roda a cada clique num
   // botão de status, então isso é o que mais evita chamadas ao servidor.
   const bundle = expedienteCache_ || await getExpedienteBundle_();
-  const { roster, choices, weekStart, activeDays } = bundle;
+  const { roster, choices, weekStart, activeDays, ferias } = bundle;
   const dates = getWeekDates(weekStart);
   const dayEntries = buildDayEntries(dates, activeDays);
   const table = document.getElementById('preview-table');
@@ -3247,6 +3284,7 @@ async function updatePreview(){
   if(name){
     merged[name] = {...(merged[name]||{}), ...currentSelection};
   }
+  const view = mergeFerias_(merged, ferias, dates); // Férias por período aplicadas por cima
 
   let html = '<thead><tr><th class="nome-h">Nome</th>';
   dayEntries.forEach(e=> html += `<th class="${dayThClass(e)}">${e.day}<br><span style="font-weight:400;font-size:10px">${e.active ? (e.date?fmtDate(e.date):'') : 'Feriado'}</span></th>`);
@@ -3263,7 +3301,7 @@ async function updatePreview(){
           html += `<td class="td-holiday">—</td>`;
           return;
         }
-        const st = (merged[p.name]||{})[e.day];
+        const st = (view[p.name]||{})[e.day];
         if(st && STATUS[st]){
           html += `<td class="${STATUS[st].cls}">${STATUS[st].symbol}</td>`;
         } else {
@@ -3301,9 +3339,12 @@ document.getElementById('save-btn').onclick = async ()=>{
   try{
     const activeDays = parseBatchValue_(freshBatch, K_ACTIVE_DAYS, [...DAYS]);
     let autoFilled = false;
+    const feriasBundle = expedienteCache_ || await getExpedienteBundle_();
+    const lockedNow = feriasMap_(feriasBundle.ferias, getWeekDates(feriasBundle.weekStart))[name] || {};
     ALL_DAYS.forEach(day=>{
       const isWeekend = WEEKEND_DAYS.includes(day);
       const isActive = isWeekend || activeDays.includes(day);
+      if(lockedNow[day]){ currentSelection[day] = null; return; }
       if(isActive && !currentSelection[day]){
         currentSelection[day] = 'folga';
         autoFilled = true;
@@ -3334,6 +3375,115 @@ document.getElementById('save-btn').onclick = async ()=>{
   btn.disabled = false;
 };
 
+/* ---------- SUBSEGOP: Férias por período (preenchimento automático do expediente) ----------
+   Guardado em K_FERIAS = [{id, name, start:'YYYY-MM-DD', end:'YYYY-MM-DD'}].
+   Não é gravado nas escolhas da semana: é aplicado por cima na hora de mostrar
+   (marcar, prévia, compilada e Excel), então vale pra qualquer semana, acompanha
+   edições/remoções do período e não some com "Limpar dados". Inclui sábado e domingo;
+   dia de feriado da semana continua sem expediente. */
+const K_FERIAS = "ferias_periodos";
+
+function feriasIso_(d){
+  return d.getFullYear() + '-' + String(d.getMonth()+1).padStart(2,'0') + '-' + String(d.getDate()).padStart(2,'0');
+}
+function feriasFmt_(iso){
+  const p = String(iso).split('-');
+  return p.length === 3 ? p[2] + '/' + p[1] + '/' + p[0] : iso;
+}
+// { nome: { Seg:'ferias', ..., Dom:'ferias' } } só com os dias da semana (dates) cobertos por algum período.
+function feriasMap_(periodos, dates){
+  const out = {};
+  if(!Array.isArray(periodos) || !dates || !dates.length) return out;
+  ALL_DAYS.forEach((day, i)=>{
+    if(!dates[i]) return;
+    const iso = feriasIso_(dates[i]);
+    periodos.forEach(p=>{
+      if(p && p.name && p.start <= iso && iso <= p.end){
+        (out[p.name] = out[p.name] || {})[day] = 'ferias';
+      }
+    });
+  });
+  return out;
+}
+function mergeFerias_(choices, periodos, dates){
+  const map = feriasMap_(periodos, dates);
+  const out = Object.assign({}, choices);
+  Object.keys(map).forEach(name=>{ out[name] = Object.assign({}, out[name] || {}, map[name]); });
+  return out;
+}
+async function getFerias_(){
+  try{ const r = await window.storage.get(K_FERIAS, true); const v = r ? JSON.parse(r.value) : []; return Array.isArray(v) ? v : []; }
+  catch(e){ return []; }
+}
+
+// Card de cadastro (admin e responsável). `afterChange` redesenha a pessoa
+// selecionada e a prévia depois de adicionar/remover um período.
+function renderFeriasCard_(canManage, roster, afterChange){
+  const card = document.getElementById('ferias-card');
+  if(!card) return;
+  card.style.display = canManage ? 'block' : 'none';
+  if(!canManage) return;
+  const nameSel = document.getElementById('ferias-name-select');
+  const startEl = document.getElementById('ferias-start');
+  const endEl = document.getElementById('ferias-end');
+  const statusEl = document.getElementById('ferias-status');
+  const listEl = document.getElementById('ferias-list');
+  nameSel.innerHTML = '<option value="">-- selecione --</option>' +
+    sortByRank_(roster).map(p=> `<option value="${p.name}">${displayName_(p)}</option>`).join('');
+
+  const todayIso = feriasIso_(new Date());
+  const renderList = ()=>{
+    const list = ((expedienteCache_ && expedienteCache_.ferias) || []).slice()
+      .sort((a,b)=> (a.end < todayIso ? 1 : 0) - (b.end < todayIso ? 1 : 0) || a.start.localeCompare(b.start));
+    listEl.innerHTML = list.length ? list.map(p=>{
+      const person = roster.find(r=> r.name === p.name) || { name: p.name };
+      const state = p.end < todayIso ? 'encerrado' : (p.start <= todayIso ? 'em curso' : 'futuro');
+      return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;${state === 'encerrado' ? 'opacity:.55;' : ''}">
+        <div style="font-size:13px;color:var(--text);"><strong>${origEsc_(displayName_(person))}</strong> — ${feriasFmt_(p.start)} a ${feriasFmt_(p.end)}
+          <span style="font-size:11px;color:var(--muted);">(${state})</span></div>
+        <button class="add-row-btn" style="margin:0;" data-ferias-del="${p.id}">Remover</button></div>`;
+    }).join('') : '<p style="font-size:12px;color:var(--muted);margin:0;">Nenhum período de férias cadastrado.</p>';
+    listEl.querySelectorAll('[data-ferias-del]').forEach(btn=> btn.onclick = async ()=>{
+      const p = list.find(x=> x.id === btn.dataset.feriasDel);
+      if(!p) return;
+      if(!await askConfirm('Remover as férias de ' + p.name + ' (' + feriasFmt_(p.start) + ' a ' + feriasFmt_(p.end) + ')? Os dias voltam a ser preenchidos normalmente.')) return;
+      const fresh = (await getFerias_()).filter(x=> x.id !== p.id);
+      await window.storage.set(K_FERIAS, JSON.stringify(fresh), true);
+      if(expedienteCache_) expedienteCache_.ferias = fresh;
+      logEvent('preenchimento', currentUserName || 'Admin', 'Removeu férias de ' + p.name + ' (' + p.start + ' a ' + p.end + ') (SUBSEGOP)');
+      renderList();
+      if(afterChange) await afterChange();
+    });
+  };
+  renderList();
+
+  document.getElementById('ferias-add-btn').onclick = async ()=>{
+    const name = nameSel.value, start = startEl.value, end = endEl.value;
+    const fail = (msg)=>{ statusEl.style.color = '#f87171'; statusEl.textContent = msg; };
+    if(!name) return fail('Selecione a pessoa.');
+    if(!start || !end) return fail('Informe o início e o fim do período.');
+    if(end < start) return fail('O fim não pode ser antes do início.');
+    try{
+      // Lê de novo antes de gravar (outro responsável pode ter cadastrado agora) e descarta períodos encerrados há mais de 120 dias.
+      const limit = new Date(); limit.setDate(limit.getDate() - 120);
+      const limitIso = feriasIso_(limit);
+      const fresh = (await getFerias_()).filter(p=> p.end >= limitIso);
+      fresh.push({ id: 'fe_' + Date.now().toString(36) + Math.random().toString(36).slice(2,6), name, start, end });
+      await window.storage.set(K_FERIAS, JSON.stringify(fresh), true);
+      if(expedienteCache_) expedienteCache_.ferias = fresh;
+      logEvent('preenchimento', currentUserName || 'Admin', 'Registrou férias de ' + name + ' (' + start + ' a ' + end + ') (SUBSEGOP)');
+      startEl.value = ''; endEl.value = '';
+      statusEl.style.color = '#22c55e';
+      statusEl.textContent = 'Período de férias cadastrado — a escala já mostra esses dias como Férias.';
+      renderList();
+      if(afterChange) await afterChange();
+    }catch(e){
+      fail('Erro ao salvar. Tente novamente.');
+    }
+    setTimeout(()=>{ statusEl.textContent = ''; }, 5000);
+  };
+}
+
 /* ---------- SUBSEGOP: aba Compilada ---------- */
 document.getElementById('refresh-btn').onclick = loadCompiled;
 
@@ -3341,8 +3491,9 @@ async function loadCompiled(){
   const canExport = currentRole === 'admin' || currentLevels.subsegop === 'responsavel';
   document.getElementById('export-btn').style.display = canExport ? '' : 'none';
   document.getElementById('export-csv-btn').style.display = canExport ? '' : 'none';
-  const { roster, choices, weekStart, obs, activeDays } = await getExpedienteBundle_();
+  const { roster, choices: rawChoices, weekStart, obs, activeDays, ferias } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
+  const choices = mergeFerias_(rawChoices, ferias, dates);
   const dayEntries = buildDayEntries(dates, activeDays);
 
   document.getElementById('range-label').textContent =
@@ -3431,8 +3582,9 @@ async function downloadXLSX_(filename, sheetName, rows){
 }
 
 document.getElementById('export-csv-btn').onclick = async ()=>{
-  const { roster, choices, weekStart, activeDays } = await getExpedienteBundle_();
+  const { roster, choices: rawChoices, weekStart, activeDays, ferias } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
+  const choices = mergeFerias_(rawChoices, ferias, dates);
   const dayEntries = buildDayEntries(dates, activeDays);
 
   const header = ['Categoria', 'Nome', ...dayEntries.map(e =>
