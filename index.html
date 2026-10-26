@@ -5,8 +5,19 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Escalas — SUBSEGOP / Of Lig CEMADEN</title>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<script>
+(function(){
+  var t=null;
+  try{ t=localStorage.getItem('escalas-theme'); }catch(e){}
+  if(t!=='light' && t!=='dark'){
+    t=(window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) ? 'light' : 'dark';
+  }
+  document.documentElement.setAttribute('data-theme',t);
+})();
+</script>
 <style>
   :root{
+    color-scheme:dark;
     --bg:#0f172a;
     --card:#1e293b;
     --card2:#16213a;
@@ -299,10 +310,70 @@
   .orig-tag-admin{background:#854d0e;border-color:#854d0e;color:white;}
   .orig-up{color:#22c55e;font-weight:700;}
   .orig-down{color:#f87171;font-weight:700;}
+
+  /* ---------- Tema claro ----------
+     Só redefine as variáveis de interface (fundo, cartões, texto, bordas) e
+     os poucos elementos escuros fixos. As cores com significado (escala,
+     legendas, caixas de cota, abas dos grupos, status) NÃO mudam — as
+     tabelas de escala já são sempre brancas e as caixas de cota/legenda têm
+     fundo próprio com texto escuro. */
+  :root[data-theme="light"]{
+    color-scheme:light;
+    --bg:#f1f5f9;
+    --card:#ffffff;
+    --card2:#f1f5f9;
+    --accent:#2563eb;
+    --text:#0f172a;
+    --muted:#475569;
+    --border:#cbd5e1;
+  }
+  :root[data-theme="light"] .tab-group.active-group{background:rgba(37,99,235,0.07);}
+  :root[data-theme="light"] .day-row.day-row-weekend{background:#f3e8ff;border-color:#c084fc;}
+  :root[data-theme="light"] .orig-banner.orig-warn{background:#fef3c7;border-color:#f59e0b;color:#78350f;}
+  :root[data-theme="light"] .orig-step-warn{color:#b45309;}
+  :root[data-theme="light"] .orig-up{color:#15803d;}
+  :root[data-theme="light"] .orig-down{color:#b91c1c;}
+  :root[data-theme="light"] #logout-btn{color:#b91c1c;border-color:#fca5a5;}
+  :root[data-theme="light"] #logout-btn:hover{background:#fee2e2;}
+  :root[data-theme="light"] #pin-error{color:#b91c1c;}
+  :root[data-theme="light"] [id$="release-banner"]{background:#fee2e2 !important;border-color:#fca5a5 !important;}
+  :root[data-theme="light"] [id$="release-banner"] span[style*="font-size"]{color:#7f1d1d !important;}
+  :root[data-theme="light"] [style*="color:#fbbf24"]{color:#92400e !important;}
+  :root[data-theme="light"] [style*="color:#f87171"],
+  :root[data-theme="light"] [style*="color: rgb(248, 113, 113)"]{color:#b91c1c !important;}
+  :root[data-theme="light"] [style*="color:#22c55e"],
+  :root[data-theme="light"] [style*="color: rgb(34, 197, 94)"]{color:#15803d !important;}
+  :root[data-theme="light"] .status{color:#15803d;}
+  /* Botão de tema (fixo no canto, visível também na tela de login) */
+  #theme-toggle{position:fixed;top:10px;right:10px;z-index:1001;width:38px;height:38px;border-radius:50%;
+    background:var(--card);border:1px solid var(--border);color:var(--text);font-size:18px;line-height:1;
+    cursor:pointer;display:flex;align-items:center;justify-content:center;box-shadow:0 2px 6px rgba(0,0,0,.25);}
+  #theme-toggle:hover{border-color:var(--accent);}
+  h1{padding-right:44px;}
 </style>
 
 </head>
 <body>
+
+<button id="theme-toggle" type="button" aria-label="Alternar tema claro/escuro" title="Alternar tema claro/escuro">🌙</button>
+<script>
+(function(){
+  var btn=document.getElementById('theme-toggle');
+  function cur(){ return document.documentElement.getAttribute('data-theme')==='light' ? 'light' : 'dark'; }
+  function paint(){
+    var light = cur()==='light';
+    btn.textContent = light ? '🌙' : '☀️';
+    btn.title = light ? 'Mudar para tema escuro' : 'Mudar para tema claro';
+  }
+  btn.onclick=function(){
+    var next = cur()==='light' ? 'dark' : 'light';
+    document.documentElement.setAttribute('data-theme',next);
+    try{ localStorage.setItem('escalas-theme',next); }catch(e){}
+    paint();
+  };
+  paint();
+})();
+</script>
 
 <div id="lock-screen">
   <div id="lock-box">
@@ -387,10 +458,10 @@
     <div class="tab-group-label">SUBSEGOP</div>
     <div class="tab-group-row">
       <div class="tab tab-grp-expediente" data-panel="fill-subsegop" data-group="subsegop">Meus Expedientes</div>
-      <div class="tab tab-grp-expediente" data-panel="compiled-subsegop" data-group="subsegop" data-level-only="responsavel">Escala Expediente</div>
+      <div class="tab tab-grp-expediente" data-panel="compiled-subsegop" data-group="subsegop">Escala Expediente</div>
       <div class="tab tab-grp-expediente" data-panel="admin-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Configurar SUBSEGOP</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="fill-subsegop-serv" data-group="subsegop">Escolher Serviços</div>
-      <div class="tab tab-grp-subsegop-serv" data-panel="compiled-subsegop-serv" data-group="subsegop" data-level-only="responsavel">Escala Compilada SUBSEGOP</div>
+      <div class="tab tab-grp-subsegop-serv" data-panel="compiled-subsegop-serv" data-group="subsegop">Escala Compilada SUBSEGOP</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="swaps-subsegop-serv" data-group="subsegop">Trocas de plantão</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="admin-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar Serviço Mensal</div>
       <div class="tab tab-grp-proximo" data-panel="fill-subsegop-serv-next" data-group="subsegop">Meus serviços — próximo mês</div>
@@ -403,11 +474,11 @@
     <div class="tab-group-label">OF LIG CEMADEN</div>
     <div class="tab-group-row">
       <div class="tab tab-grp-cemaden-atual" data-panel="fill-cemaden" data-group="cemaden">Escolher Serviços CEMADEN</div>
-      <div class="tab tab-grp-cemaden-atual" data-panel="compiled-cemaden" data-group="cemaden" data-level-only="responsavel">Escala Compilada CEMADEN</div>
+      <div class="tab tab-grp-cemaden-atual" data-panel="compiled-cemaden" data-group="cemaden">Escala Compilada CEMADEN</div>
       <div class="tab tab-grp-cemaden-atual" data-panel="swaps-cemaden" data-group="cemaden">Trocas de plantão</div>
       <div class="tab tab-grp-cemaden-atual" data-panel="admin-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Configurar CEMADEN</div>
       <div class="tab tab-grp-elnino-atual" data-panel="fill-elnino" data-group="cemaden">Escolher Serviços El Niño</div>
-      <div class="tab tab-grp-elnino-atual" data-panel="compiled-elnino" data-group="cemaden" data-level-only="responsavel">Escala Compilada El Niño</div>
+      <div class="tab tab-grp-elnino-atual" data-panel="compiled-elnino" data-group="cemaden">Escala Compilada El Niño</div>
       <div class="tab tab-grp-elnino-atual" data-panel="swaps-elnino" data-group="cemaden">Trocas — Comitê El Niño</div>
       <div class="tab tab-grp-elnino-atual" data-panel="admin-elnino" data-admin-only="true" data-admin-only-setor="cemaden">Configurar El Niño</div>
       <div class="tab tab-grp-proximo-fill" data-panel="fill-cemaden-next" data-group="cemaden">Serviço CEMADEN — próximo mês</div>
@@ -422,7 +493,7 @@
     <div class="tab-group-label">NIIAD</div>
     <div class="tab-group-row">
       <div class="tab tab-grp-atual" data-panel="fill-niiad" data-group="niiad">Escolher Serviços</div>
-      <div class="tab tab-grp-atual" data-panel="compiled-niiad" data-group="niiad" data-level-only="responsavel">Escala Compilada</div>
+      <div class="tab tab-grp-atual" data-panel="compiled-niiad" data-group="niiad">Escala Compilada</div>
       <div class="tab tab-grp-atual" data-panel="swaps-niiad" data-group="niiad">Trocas de plantão</div>
       <div class="tab tab-grp-atual" data-panel="admin-niiad" data-admin-only="true" data-admin-only-setor="niiad">Configurar NIIAD</div>
       <div class="tab tab-grp-proximo" data-panel="fill-niiad-next" data-group="niiad">Meus Serviços — próximo mês</div>
@@ -4692,6 +4763,8 @@ async function loadSCompiled(month){
   const canExport = currentRole === 'admin' || currentLevels.subsegop === 'responsavel';
   document.getElementById('s-export-btn').style.display = canExport ? '' : 'none';
   document.getElementById('s-export-csv-btn').style.display = canExport ? '' : 'none';
+  // Distribuição por pessoa (cotas/totais): só responsável, admin e supervisão.
+  document.getElementById('s-summary-wrap').style.display = (canExport || currentRole === 'supervisor') ? '' : 'none';
   await populateMonthSelect_('s-compiled-month-select', K_S_MONTHLIST, month, (m)=> loadSCompiled(m));
   // Uma única ida ao servidor (em vez de 2 chamadas Promise.all separadas)
   // pra montar a Escala Compilada inteira.
@@ -5756,6 +5829,8 @@ async function loadCCompiled(month){
   const canExport = currentRole === 'admin' || currentLevels.cemaden === 'responsavel';
   document.getElementById('c-export-btn').style.display = canExport ? '' : 'none';
   document.getElementById('c-export-csv-btn').style.display = canExport ? '' : 'none';
+  // Distribuição por pessoa (cotas/totais): só responsável, admin e supervisão.
+  document.getElementById('c-summary-wrap').style.display = (canExport || currentRole === 'supervisor') ? '' : 'none';
   await populateMonthSelect_('c-compiled-month-select', K_C_MONTHLIST, month, (m)=> loadCCompiled(m));
   // Uma única ida ao servidor (em vez de 2 chamadas Promise.all separadas)
   // pra montar a Escala Compilada inteira.
@@ -6859,6 +6934,8 @@ async function loadENCompiled(month){
   const canExport = currentRole === 'admin' || currentLevels.cemaden === 'responsavel';
   document.getElementById('en-export-btn').style.display = canExport ? '' : 'none';
   document.getElementById('en-export-csv-btn').style.display = canExport ? '' : 'none';
+  // Distribuição por pessoa (cotas/totais): só responsável, admin e supervisão.
+  document.getElementById('en-summary-wrap').style.display = (canExport || currentRole === 'supervisor') ? '' : 'none';
   await populateMonthSelect_('en-compiled-month-select', K_EN_MONTHLIST, month, (m)=> loadENCompiled(m));
   // Uma única ida ao servidor (em vez de 2 chamadas Promise.all separadas)
   // pra montar a Escala Compilada inteira.
@@ -8320,6 +8397,8 @@ async function loadNCompiled(month){
   const canExport = currentRole === 'admin' || currentLevels.niiad === 'responsavel';
   document.getElementById('n-export-btn').style.display = canExport ? '' : 'none';
   document.getElementById('n-export-csv-btn').style.display = canExport ? '' : 'none';
+  // Distribuição por pessoa (cotas/totais): só responsável, admin e supervisão.
+  document.getElementById('n-summary-wrap').style.display = (canExport || currentRole === 'supervisor') ? '' : 'none';
   await populateMonthSelect_('n-compiled-month-select', K_N_MONTHLIST, month, (m)=> loadNCompiled(m));
   // Uma única ida ao servidor (em vez de 2 chamadas Promise.all separadas)
   // pra montar a Escala Compilada inteira.
