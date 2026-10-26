@@ -460,7 +460,7 @@
       <div class="tab tab-grp-expediente" data-panel="fill-subsegop" data-group="subsegop">Meus Expedientes</div>
       <div class="tab tab-grp-expediente" data-panel="compiled-subsegop" data-group="subsegop">Escala Expediente</div>
       <div class="tab tab-grp-expediente" data-panel="admin-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Configurar SUBSEGOP</div>
-      <div class="tab tab-grp-subsegop-serv" data-panel="fill-subsegop-serv" data-group="subsegop">Escolher Serviços</div>
+      <div class="tab tab-grp-subsegop-serv" data-panel="fill-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Escolher Serviços</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="compiled-subsegop-serv" data-group="subsegop">Escala Compilada SUBSEGOP</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="swaps-subsegop-serv" data-group="subsegop">Trocas de plantão</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="admin-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar Serviço Mensal</div>
@@ -473,11 +473,11 @@
   <div class="tab-group">
     <div class="tab-group-label">OF LIG CEMADEN</div>
     <div class="tab-group-row">
-      <div class="tab tab-grp-cemaden-atual" data-panel="fill-cemaden" data-group="cemaden">Escolher Serviços CEMADEN</div>
+      <div class="tab tab-grp-cemaden-atual" data-panel="fill-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Escolher Serviços CEMADEN</div>
       <div class="tab tab-grp-cemaden-atual" data-panel="compiled-cemaden" data-group="cemaden">Escala Compilada CEMADEN</div>
       <div class="tab tab-grp-cemaden-atual" data-panel="swaps-cemaden" data-group="cemaden">Trocas de plantão</div>
       <div class="tab tab-grp-cemaden-atual" data-panel="admin-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Configurar CEMADEN</div>
-      <div class="tab tab-grp-elnino-atual" data-panel="fill-elnino" data-group="cemaden">Escolher Serviços El Niño</div>
+      <div class="tab tab-grp-elnino-atual" data-panel="fill-elnino" data-admin-only="true" data-admin-only-setor="cemaden">Escolher Serviços El Niño</div>
       <div class="tab tab-grp-elnino-atual" data-panel="compiled-elnino" data-group="cemaden">Escala Compilada El Niño</div>
       <div class="tab tab-grp-elnino-atual" data-panel="swaps-elnino" data-group="cemaden">Trocas — Comitê El Niño</div>
       <div class="tab tab-grp-elnino-atual" data-panel="admin-elnino" data-admin-only="true" data-admin-only-setor="cemaden">Configurar El Niño</div>
@@ -492,7 +492,7 @@
   <div class="tab-group">
     <div class="tab-group-label">NIIAD</div>
     <div class="tab-group-row">
-      <div class="tab tab-grp-atual" data-panel="fill-niiad" data-group="niiad">Escolher Serviços</div>
+      <div class="tab tab-grp-atual" data-panel="fill-niiad" data-admin-only="true" data-admin-only-setor="niiad">Escolher Serviços</div>
       <div class="tab tab-grp-atual" data-panel="compiled-niiad" data-group="niiad">Escala Compilada</div>
       <div class="tab tab-grp-atual" data-panel="swaps-niiad" data-group="niiad">Trocas de plantão</div>
       <div class="tab tab-grp-atual" data-panel="admin-niiad" data-admin-only="true" data-admin-only-setor="niiad">Configurar NIIAD</div>
@@ -781,12 +781,27 @@
     <select id="s-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Fora do mês vigente, a tela vira histórico — só consulta, sem ações.</p>
   </div>
+  <div class="roster-card" id="s-perm-card">
+    <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
+    <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
+    <select id="s-perm-day-select"></select>
+    <label>Permutar com</label>
+    <select id="s-perm-target-select"></select>
+    <label>Dia dessa pessoa que passo a assumir</label>
+    <select id="s-perm-theirday-select"></select>
+    <div id="s-perm-preview" style="font-size:12px;color:var(--muted);margin-top:8px;"></div>
+    <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">Cada pessoa assume o dia da outra. Dias consecutivos são permitidos, mas geram aviso. Se os dois dias forem de tipos diferentes (preto, sexta ou vermelho), a cota de cada um muda. Em ambos os casos o admin é avisado.</p>
+    <button class="save-btn" id="s-perm-propose-btn">Enviar pedido de permuta</button>
+    <div class="status" id="s-perm-status"></div>
+  </div>
   <div class="roster-card" id="s-swap-propose-card">
-    <label style="margin-top:0;">Propor troca de um dia meu</label>
+    <label style="margin-top:0;">Ceder um dia meu (cessão de serviço — sem receber outro dia em troca)</label>
+    <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="s-swap-day-select"></select>
     <label>Passar para</label>
     <select id="s-swap-target-select"></select>
-    <button class="save-btn" id="s-swap-propose-btn">Enviar pedido de troca</button>
+    <div id="s-swap-preview" style="font-size:12px;margin-top:8px;"></div>
+    <button class="save-btn" id="s-swap-propose-btn">Enviar pedido de cessão</button>
     <div class="status" id="s-swap-propose-status"></div>
   </div>
 
@@ -1020,12 +1035,27 @@
     <select id="c-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Fora do mês vigente, a tela vira histórico — só consulta, sem ações.</p>
   </div>
+  <div class="roster-card" id="c-perm-card">
+    <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
+    <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
+    <select id="c-perm-day-select"></select>
+    <label>Permutar com</label>
+    <select id="c-perm-target-select"></select>
+    <label>Dia dessa pessoa que passo a assumir</label>
+    <select id="c-perm-theirday-select"></select>
+    <div id="c-perm-preview" style="font-size:12px;color:var(--muted);margin-top:8px;"></div>
+    <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">Cada pessoa assume o dia da outra. Dias consecutivos são permitidos, mas geram aviso. Se os dois dias forem de tipos diferentes (preto, sexta ou vermelho), a cota de cada um muda. Em ambos os casos o admin é avisado.</p>
+    <button class="save-btn" id="c-perm-propose-btn">Enviar pedido de permuta</button>
+    <div class="status" id="c-perm-status"></div>
+  </div>
   <div class="roster-card" id="c-swap-propose-card">
-    <label style="margin-top:0;">Propor troca de um dia meu</label>
+    <label style="margin-top:0;">Ceder um dia meu (cessão de serviço — sem receber outro dia em troca)</label>
+    <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="c-swap-day-select"></select>
     <label>Passar para</label>
     <select id="c-swap-target-select"></select>
-    <button class="save-btn" id="c-swap-propose-btn">Enviar pedido de troca</button>
+    <div id="c-swap-preview" style="font-size:12px;margin-top:8px;"></div>
+    <button class="save-btn" id="c-swap-propose-btn">Enviar pedido de cessão</button>
     <div class="status" id="c-swap-propose-status"></div>
   </div>
 
@@ -1302,12 +1332,27 @@
     <select id="en-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Fora do mês vigente, a tela vira histórico — só consulta, sem ações.</p>
   </div>
+  <div class="roster-card" id="en-perm-card">
+    <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
+    <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
+    <select id="en-perm-day-select"></select>
+    <label>Permutar com</label>
+    <select id="en-perm-target-select"></select>
+    <label>Dia dessa pessoa que passo a assumir</label>
+    <select id="en-perm-theirday-select"></select>
+    <div id="en-perm-preview" style="font-size:12px;color:var(--muted);margin-top:8px;"></div>
+    <p style="font-size:11px;color:var(--muted);margin:8px 0 0;">Cada pessoa assume o dia da outra. Dias consecutivos são permitidos, mas geram aviso. Se os dois dias forem de tipos diferentes (preto, sexta ou vermelho), a cota de cada um muda. Em ambos os casos o admin é avisado.</p>
+    <button class="save-btn" id="en-perm-propose-btn">Enviar pedido de permuta</button>
+    <div class="status" id="en-perm-status"></div>
+  </div>
   <div class="roster-card" id="en-swap-propose-card">
-    <label style="margin-top:0;">Propor troca de um dia meu</label>
+    <label style="margin-top:0;">Ceder um dia meu (cessão de serviço — sem receber outro dia em troca)</label>
+    <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="en-swap-day-select"></select>
     <label>Passar para</label>
     <select id="en-swap-target-select"></select>
-    <button class="save-btn" id="en-swap-propose-btn">Enviar pedido de troca</button>
+    <div id="en-swap-preview" style="font-size:12px;margin-top:8px;"></div>
+    <button class="save-btn" id="en-swap-propose-btn">Enviar pedido de cessão</button>
     <div class="status" id="en-swap-propose-status"></div>
   </div>
 
@@ -1555,9 +1600,11 @@
   </div>
   <div class="roster-card" id="n-swap-propose-card">
     <label style="margin-top:0;">Ceder um dia meu (cessão de serviço — sem receber outro dia em troca)</label>
+    <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="n-swap-day-select"></select>
     <label>Passar para</label>
     <select id="n-swap-target-select"></select>
+    <div id="n-swap-preview" style="font-size:12px;margin-top:8px;"></div>
     <button class="save-btn" id="n-swap-propose-btn">Enviar pedido de cessão</button>
     <div class="status" id="n-swap-propose-status"></div>
   </div>
@@ -2346,6 +2393,231 @@ function populateSwapAdminDirect_(prefix, roster, assignments, month, slotNamesF
 }
 // Pra colorir a escala compilada: dia → Set com os nomes que ocuparam a vaga
 // naquele dia via troca aprovada (item 2 do feedback).
+/* ---------- Permuta genérica (SUBSEGOP Serviço Mensal, CEMADEN, Adm Comitê El Niño) ----------
+   Mesmo fluxo da permuta do NIIAD (aguardando_destino → aguardando_admin →
+   aprovada), mas sem ORD/RAS: cada pessoa assume o dia da outra. Dias
+   consecutivos são permitidos. Se os dois dias forem de tipos diferentes
+   (preto/sexta/vermelho) a cota de cada um muda — vira só um aviso pro admin.
+   Permuta E cessão ficam bloqueadas enquanto o preenchimento do mês está
+   liberado (escala ainda em montagem). */
+/* ---------- Aviso de dias consecutivos (cessão e permuta) ----------
+   Não bloqueia: só avisa quem propõe (prévia) e o admin (lista de pendentes
+   e confirmação na aprovação). A regra rígida continua só em "assumir vaga". */
+function slotNameOf_(raw){ return typeof raw === 'string' ? raw : (raw && raw.name) || ''; }
+// Dias vizinhos (day±1) em que `name` já está, ignorando `ignoreDay` (dia que ela está deixando).
+function consecNeighbors_(assignments, name, day, ignoreDay){
+  day = Number(day);
+  return [day - 1, day + 1].filter(d=>
+    d >= 1 && d !== Number(ignoreDay) && (assignments[String(d)] || []).some(raw=> slotNameOf_(raw) === name));
+}
+function consecWarnText_(name, day, neighbors){
+  return name + ' ficaria com dias consecutivos (dia ' + day + ' junto com o dia ' + neighbors.join(' e ') + ').';
+}
+// Cessão: quem recebe o dia `day`.
+function cessaoConsecWarn_(assignments, toName, day){
+  const nb = consecNeighbors_(assignments, toName, day, null);
+  return nb.length ? consecWarnText_(toName, day, nb) : '';
+}
+// Prévia de aviso sob o cartão de cessão (todos os setores).
+function cessaoWarnSetup_(p, assignments){
+  const daySel = document.getElementById(p + '-swap-day-select');
+  const targetSel = document.getElementById(p + '-swap-target-select');
+  const previewEl = document.getElementById(p + '-swap-preview');
+  if(!daySel || !targetSel || !previewEl) return;
+  const refresh = ()=>{
+    const w = (daySel.value && targetSel.value) ? cessaoConsecWarn_(assignments, targetSel.value, daySel.value) : '';
+    previewEl.innerHTML = w ? '<span style="color:#fbbf24;">⚠️ ' + origEsc_(w) + ' O admin será avisado.</span>' : '';
+  };
+  daySel.addEventListener('change', refresh);
+  targetSel.addEventListener('change', refresh);
+  refresh();
+}
+function permCfg_(p){
+  const common = { p };
+  if(p === 's') return Object.assign(common, {
+    setor:'subsegop', origGroup:'subsegop_serv', label:'SUBSEGOP Serviço Mensal', adminTab:'Configurar Serviço Mensal',
+    getAssign:getSAssignments, setAssign:setSAssignments, getTypes:getSDayTypes, dayType:sDayType,
+    getSwaps:getSSwaps, setSwaps:setSSwaps, relKey:K_S_RELEASED, reload:loadSSwapsPanel,
+    refreshCal:(month)=> renderSCalendarList(null, {idPrefix: month === currentMonthISO_() ? 's' : 's-pick-next', month}) });
+  if(p === 'c') return Object.assign(common, {
+    setor:'cemaden', origGroup:'cemaden', label:'CEMADEN', adminTab:'Configurar CEMADEN',
+    getAssign:getCAssignments, setAssign:setCAssignments, getTypes:getCDayTypes, dayType:cDayType,
+    getSwaps:getCSwaps, setSwaps:setCSwaps, relKey:K_C_RELEASED, reload:loadCSwapsPanel,
+    refreshCal:(month)=> renderCCalendarList(null, {idPrefix: month === currentMonthISO_() ? 'c' : 'c-pick-next', month}) });
+  return Object.assign(common, {
+    setor:'cemaden', origGroup:'elnino', label:'Adm Comitê El Niño', adminTab:'Configurar El Niño',
+    getAssign:getENAssignments, setAssign:setENAssignments, getTypes:getENDayTypes, dayType:enDayType,
+    getSwaps:getENSwaps, setSwaps:setENSwaps, relKey:K_EN_RELEASED, reload:loadENSwapsPanel,
+    refreshCal:(month)=> renderENCalendarList(null, {idPrefix: month === currentMonthISO_() ? 'en' : 'en-pick-next', month}) });
+}
+const PERM_TYPE_LABEL_ = { preto:'preto', sexta:'sexta', vermelho:'vermelho' };
+async function permIsReleasedFresh_(relKey, month){
+  const b = await window.storage.getBatch([monthKey_(relKey, month)]);
+  return parseBatchValue_(b, monthKey_(relKey, month), false) === true;
+}
+// Valida a permuta com os dados atuais; devolve {ok, reason, warns}.
+function permCheck_(cfg, assignments, dayTypes, month, nameA, dayX, nameB, dayY){
+  dayX = Number(dayX); dayY = Number(dayY);
+  if(!dayX || !dayY) return { ok:false, reason:'escolha os dois dias' };
+  if(dayX === dayY) return { ok:false, reason:'os dois dias são o mesmo' };
+  if(nameA === nameB) return { ok:false, reason:'escolha outra pessoa' };
+  const slotsX = assignments[String(dayX)] || [];
+  const slotsY = assignments[String(dayY)] || [];
+  if(!slotsX.includes(nameA)) return { ok:false, reason: nameA + ' não está mais no dia ' + dayX };
+  if(!slotsY.includes(nameB)) return { ok:false, reason: nameB + ' não está mais no dia ' + dayY };
+  if(slotsY.includes(nameA)) return { ok:false, reason: nameA + ' já está no dia ' + dayY };
+  if(slotsX.includes(nameB)) return { ok:false, reason: nameB + ' já está no dia ' + dayX };
+  const warns = [];
+  const tX = cfg.dayType(dayTypes, month, dayX), tY = cfg.dayType(dayTypes, month, dayY);
+  if(tX !== tY){
+    warns.push('Os dias são de tipos diferentes: dia ' + dayX + ' é ' + (PERM_TYPE_LABEL_[tX] || tX) + ' e dia ' + dayY + ' é ' + (PERM_TYPE_LABEL_[tY] || tY) + '. A cota de cada um muda.');
+  }
+  const nbA = consecNeighbors_(assignments, nameA, dayY, dayX);
+  const nbB = consecNeighbors_(assignments, nameB, dayX, dayY);
+  if(nbA.length) warns.push(consecWarnText_(nameA, dayY, nbA));
+  if(nbB.length) warns.push(consecWarnText_(nameB, dayX, nbB));
+  return { ok:true, warns };
+}
+// Marca _warn nos pedidos de permuta pendentes (só pra exibir ao admin).
+function permAnnotate_(cfg, swaps, assignments, dayTypes, month){
+  swaps.forEach(r=>{
+    if(r.status !== 'aguardando_admin' && r.status !== 'aguardando_destino') return;
+    if(r.kind !== 'permuta'){
+      if(!r.kind) r._warn = cessaoConsecWarn_(assignments, r.toName, r.day);
+      return;
+    }
+    const chk = permCheck_(cfg, assignments, dayTypes, month, r.fromName, r.day, r.toName, r.dayB);
+    r._warn = chk.ok ? chk.warns.join(' ') : 'Esta permuta não pode mais ser aplicada: ' + chk.reason + '.';
+  });
+}
+// Monta o cartão de permuta e aplica o bloqueio (permuta + cessão) durante a liberação.
+function permSetup_(cfg, month, roster, assignments, dayTypes, released){
+  const p = cfg.p;
+  const card = document.getElementById(p + '-perm-card');
+  const cessao = document.getElementById(p + '-swap-propose-card');
+  const isCurrentMonth = month === currentMonthISO_();
+  const hidden = currentRole === 'admin' || currentRole === 'supervisor' || !isCurrentMonth;
+  if(cessao && !hidden){ nSetCardLock_(cessao, released === true); cessaoWarnSetup_(p, assignments); }
+  if(!card) return;
+  if(hidden){ card.style.display = 'none'; return; }
+  card.style.display = 'block';
+  nSetCardLock_(card, released === true);
+  if(released === true) return;
+  const me = currentUserName;
+  const daySel = document.getElementById(p + '-perm-day-select');
+  const targetSel = document.getElementById(p + '-perm-target-select');
+  const theirSel = document.getElementById(p + '-perm-theirday-select');
+  const previewEl = document.getElementById(p + '-perm-preview');
+  const statusEl = document.getElementById(p + '-perm-status');
+  const dayLabel = (d)=> 'Dia ' + d + ' (' + weekdayAbbrev(month, d) + ') — ' + (PERM_TYPE_LABEL_[cfg.dayType(dayTypes, month, Number(d))] || '');
+  const daysOf = (name)=> Object.keys(assignments)
+    .filter(d=> (assignments[d] || []).includes(name))
+    .map(Number).sort((a,b)=> a - b);
+
+  const myDays = daysOf(me);
+  daySel.innerHTML = myDays.length
+    ? myDays.map(d=> `<option value="${d}">${dayLabel(d)}</option>`).join('')
+    : '<option value="">-- você não tem dias assumidos neste mês --</option>';
+  targetSel.innerHTML = '<option value="">-- selecione --</option>' +
+    sortByRank_(roster).filter(x=> x.name !== me).map(x=> `<option value="${x.name}">${displayName_(x)}</option>`).join('');
+
+  const refreshTheirDays = ()=>{
+    const B = targetSel.value, X = daySel.value;
+    previewEl.textContent = '';
+    if(!B){ theirSel.innerHTML = '<option value="">-- escolha primeiro a pessoa --</option>'; return; }
+    const theirDays = daysOf(B);
+    if(!theirDays.length){ theirSel.innerHTML = '<option value="">-- essa pessoa não tem dias neste mês --</option>'; return; }
+    theirSel.innerHTML = '<option value="">-- selecione --</option>' + theirDays.map(d=>{
+      const chk = permCheck_(cfg, assignments, dayTypes, month, me, X, B, d);
+      if(!chk.ok) return `<option value="${d}" disabled>${dayLabel(d)} — indisponível: ${origEsc_(chk.reason)}</option>`;
+      return `<option value="${d}">${dayLabel(d)}${chk.warns.length ? ' ⚠️' : ''}</option>`;
+    }).join('');
+  };
+  const refreshPreview = ()=>{
+    const B = targetSel.value, X = daySel.value, Y = theirSel.value;
+    if(!B || !X || !Y){ previewEl.textContent = ''; return; }
+    const chk = permCheck_(cfg, assignments, dayTypes, month, me, X, B, Y);
+    if(!chk.ok){ previewEl.style.color = '#f87171'; previewEl.textContent = 'Não é possível: ' + chk.reason + '.'; return; }
+    previewEl.style.color = 'var(--muted)';
+    previewEl.innerHTML = 'Você passa o dia <strong>' + X + '</strong> para ' + origEsc_(B) + ' e assume o dia <strong>' + Y + '</strong>.' +
+      (chk.warns.length ? '<br><span style="color:#fbbf24;">⚠️ ' + chk.warns.map(origEsc_).join(' ') + ' O admin será avisado.</span>' : '');
+  };
+  daySel.onchange = refreshTheirDays;
+  targetSel.onchange = refreshTheirDays;
+  theirSel.onchange = refreshPreview;
+  refreshTheirDays();
+
+  document.getElementById(p + '-perm-propose-btn').onclick = async ()=>{
+    const B = targetSel.value, X = daySel.value, Y = theirSel.value;
+    if(!X || !B || !Y){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha seu dia, a pessoa e o dia dela.'; return; }
+    if(await permIsReleasedFresh_(cfg.relKey, month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
+    // Revalida com os dados mais recentes antes de gravar.
+    const [freshAssign, freshTypes] = await Promise.all([cfg.getAssign(month), cfg.getTypes(month)]);
+    const chk = permCheck_(cfg, freshAssign, freshTypes, month, me, X, B, Y);
+    if(!chk.ok){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Não é possível propor: ' + chk.reason + '.'; return; }
+    const fresh = await cfg.getSwaps(month);
+    fresh.push({ id: newSwapId_(), kind:'permuta', day: X, dayB: Y, fromName: me, toName: B,
+      status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
+    await cfg.setSwaps(month, fresh);
+    logEvent('preenchimento', me, 'Propôs permuta do dia ' + X + ' pelo dia ' + Y + ' de ' + B + ' (' + cfg.label + ')');
+    statusEl.style.color = '#22c55e';
+    statusEl.textContent = 'Pedido de permuta enviado.';
+    await cfg.reload(month);
+  };
+}
+// Aprovação do admin. null = admin desistiu (nada alterado); senão atualiza
+// req.status ('aprovada' ou 'erro_ao_aplicar') — quem chama grava a lista.
+async function permApprove_(cfg, req, month){
+  const dayTypes = await cfg.getTypes(month);
+  let assignments = await cfg.getAssign(month);
+  let chk = permCheck_(cfg, assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB);
+  if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+  if(chk.warns.length){
+    const ok = await askConfirm('⚠️ Atenção:\n' + chk.warns.join('\n') + '\nAprovar a permuta mesmo assim?');
+    if(!ok) return null;
+    // Relê após a pergunta pra não gravar por cima de mudanças feitas enquanto ela estava aberta.
+    assignments = await cfg.getAssign(month);
+    chk = permCheck_(cfg, assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB);
+    if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+  }
+  const slotsX = assignments[String(req.day)] || [];
+  const slotsY = assignments[String(req.dayB)] || [];
+  const before = 'dia ' + req.day + ': ' + slotsX.join(', ') + ' | dia ' + req.dayB + ': ' + slotsY.join(', ');
+  slotsX[slotsX.indexOf(req.fromName)] = req.toName;
+  slotsY[slotsY.indexOf(req.toName)] = req.fromName;
+  assignments[String(req.day)] = slotsX;
+  assignments[String(req.dayB)] = slotsY;
+  await cfg.setAssign(month, assignments);
+  req.status = 'aprovada';
+  logEvent('admin', adminActorLabel_(), 'Aprovou permuta (' + cfg.label + ') — ' + before + ' → dia ' + req.day + ': ' + slotsX.join(', ') + ' | dia ' + req.dayB + ': ' + slotsY.join(', '));
+  backendNotifySwapApproved(cfg.setor, cfg.label, req.month || month, req.day, req.fromName, req.toName, req.dayB);
+  return 'ok';
+}
+async function permUndo_(cfg, req, list, month){
+  const confirmed = await askConfirm('Desfazer esta permuta? O dia ' + req.day + ' volta a ficar com ' + req.fromName + ' e o dia ' + req.dayB + ' com ' + req.toName + '.');
+  if(!confirmed) return;
+  const assignments = await cfg.getAssign(month);
+  const slotsX = assignments[String(req.day)] || [];
+  const slotsY = assignments[String(req.dayB)] || [];
+  const iB = slotsX.indexOf(req.toName);
+  const iA = slotsY.indexOf(req.fromName);
+  if(iB === -1 || iA === -1 || slotsX.includes(req.fromName) || slotsY.includes(req.toName)){
+    alert('Não deu pra desfazer automaticamente: uma das vagas já mudou depois da permuta. Ajuste manualmente em "' + cfg.adminTab + '" se precisar.');
+    return;
+  }
+  slotsX[iB] = req.fromName;
+  slotsY[iA] = req.toName;
+  assignments[String(req.day)] = slotsX;
+  assignments[String(req.dayB)] = slotsY;
+  await cfg.setAssign(month, assignments);
+  req.status = 'desfeita';
+  req.undoneAt = new Date().toISOString();
+  await cfg.setSwaps(month, list);
+  logEvent('admin', adminActorLabel_(), 'Desfez permuta (' + cfg.label + ') — dia ' + req.day + ': ' + req.fromName + ' | dia ' + req.dayB + ': ' + req.toName);
+  await cfg.reload(month);
+  await cfg.refreshCal(month).catch(()=>{});
+}
+
 function swappedNamesByDay_(swaps){
   const byDay = {};
   (swaps||[]).forEach(r=>{
@@ -4256,8 +4528,11 @@ async function loadSSwapsPanel(month){
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('s-swap-month-select', K_S_MONTHLIST, month, (m)=> loadSSwapsPanel(m));
-  const { roster, assignments, swaps } = await getSBundle_(month);
+  const { roster, assignments, swaps, dayTypes, released } = await getSBundle_(month);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
+  const permCfg = permCfg_('s');
+  permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
+  permSetup_(permCfg, month, roster, assignments, dayTypes, released);
 
   // Fora do mês vigente, a tela vira histórico só-leitura: nenhum controle
   // de ação (propor/aceitar/recusar/aprovar/desfazer) fica disponível.
@@ -4287,6 +4562,7 @@ async function loadSSwapsPanel(month){
       const day = daySelect.value;
       const toName = targetSelect.value;
       if(!day || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia e a pessoa.'; return; }
+      if(await permIsReleasedFresh_(permCfg.relKey, month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
       const fresh = await getSSwaps(month);
       fresh.push({ id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
       await setSSwaps(month, fresh);
@@ -4384,7 +4660,7 @@ async function sSwapRespond_(id, accept){
   req.respondedAt = new Date().toISOString();
   await setSSwaps(month, list);
   logEvent('preenchimento', currentUserName, (accept ? 'Aceitou' : 'Recusou') + ' a troca do dia ' + req.day + ' proposta por ' + req.fromName + ' (SUBSEGOP Serviço Mensal)');
-  if(accept) backendNotifySwapPendingAdmin('subsegop', 'SUBSEGOP Serviço Mensal', req.month || month, req.day, req.fromName, req.toName);
+  if(accept) backendNotifySwapPendingAdmin('subsegop', 'SUBSEGOP Serviço Mensal', req.month || month, req.day, req.fromName, req.toName, req.dayB);
   await loadSSwapsPanel(month);
 }
 
@@ -4405,10 +4681,16 @@ async function sSwapDecide_(id, approve){
   const list = await getSSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadSSwapsPanel(month); return; }
-  if(approve){
+  if(approve && req.kind === 'permuta'){
+    await ensureOriginalSchedule_('subsegop_serv', month);
+    const outcome = await permApprove_(permCfg_('s'), req, month);
+    if(outcome === null) return; // admin desistiu — pedido continua aguardando decisão
+  } else if(approve){
     await ensureOriginalSchedule_('subsegop_serv', month);
     const assignments = await getSAssignments(month);
     const slots = assignments[req.day] || [];
+    const consecWarn = cessaoConsecWarn_(assignments, req.toName, req.day);
+    if(consecWarn && !(await askConfirm('⚠️ Atenção:\n' + consecWarn + '\nAprovar a cessão mesmo assim?'))) return; // admin desistiu — pedido continua aguardando decisão
     const idx = slots.indexOf(req.fromName);
     if(idx === -1 || slots.includes(req.toName)){
       req.status = 'erro_ao_aplicar';
@@ -4442,6 +4724,7 @@ async function sSwapUndo_(id, month){
   const list = await getSSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aprovada') { await loadSSwapsPanel(month); return; }
+  if(req.kind === 'permuta'){ await permUndo_(permCfg_('s'), req, list, month); return; }
   const confirmed = await askConfirm('Desfazer esta troca? O dia ' + req.day + ' volta a ficar com ' + req.fromName + '.');
   if(!confirmed) return;
   const assignments = await getSAssignments(month);
@@ -5362,8 +5645,11 @@ async function loadCSwapsPanel(month){
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('c-swap-month-select', K_C_MONTHLIST, month, (m)=> loadCSwapsPanel(m));
-  const { roster, assignments, swaps } = await getCBundle_(month);
+  const { roster, assignments, swaps, dayTypes, released } = await getCBundle_(month);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
+  const permCfg = permCfg_('c');
+  permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
+  permSetup_(permCfg, month, roster, assignments, dayTypes, released);
 
   document.getElementById('c-swap-propose-card').style.display = (isAdmin || isSupervisor || !isCurrentMonth) ? 'none' : 'block';
   if(!isAdmin && !isSupervisor && isCurrentMonth){
@@ -5389,6 +5675,7 @@ async function loadCSwapsPanel(month){
       const day = daySelect.value;
       const toName = targetSelect.value;
       if(!day || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia e a pessoa.'; return; }
+      if(await permIsReleasedFresh_(permCfg.relKey, month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
       const fresh = await getCSwaps(month);
       fresh.push({ id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
       await setCSwaps(month, fresh);
@@ -5470,7 +5757,7 @@ async function cSwapRespond_(id, accept){
   req.respondedAt = new Date().toISOString();
   await setCSwaps(month, list);
   logEvent('preenchimento', currentUserName, (accept ? 'Aceitou' : 'Recusou') + ' a troca do dia ' + req.day + ' proposta por ' + req.fromName + ' (CEMADEN)');
-  if(accept) backendNotifySwapPendingAdmin('cemaden', 'CEMADEN', req.month || month, req.day, req.fromName, req.toName);
+  if(accept) backendNotifySwapPendingAdmin('cemaden', 'CEMADEN', req.month || month, req.day, req.fromName, req.toName, req.dayB);
   await loadCSwapsPanel(month);
 }
 
@@ -5491,10 +5778,16 @@ async function cSwapDecide_(id, approve){
   const list = await getCSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadCSwapsPanel(month); return; }
-  if(approve){
+  if(approve && req.kind === 'permuta'){
+    await ensureOriginalSchedule_('cemaden', month);
+    const outcome = await permApprove_(permCfg_('c'), req, month);
+    if(outcome === null) return; // admin desistiu — pedido continua aguardando decisão
+  } else if(approve){
     await ensureOriginalSchedule_('cemaden', month);
     const assignments = await getCAssignments(month);
     const slots = assignments[req.day] || [];
+    const consecWarn = cessaoConsecWarn_(assignments, req.toName, req.day);
+    if(consecWarn && !(await askConfirm('⚠️ Atenção:\n' + consecWarn + '\nAprovar a cessão mesmo assim?'))) return; // admin desistiu — pedido continua aguardando decisão
     const idx = slots.indexOf(req.fromName);
     if(idx === -1 || slots.includes(req.toName)){
       req.status = 'erro_ao_aplicar';
@@ -5524,6 +5817,7 @@ async function cSwapUndo_(id, month){
   const list = await getCSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aprovada') { await loadCSwapsPanel(month); return; }
+  if(req.kind === 'permuta'){ await permUndo_(permCfg_('c'), req, list, month); return; }
   const confirmed = await askConfirm('Desfazer esta troca? O dia ' + req.day + ' volta a ficar com ' + req.fromName + '.');
   if(!confirmed) return;
   const assignments = await getCAssignments(month);
@@ -6467,8 +6761,11 @@ async function loadENSwapsPanel(month){
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('en-swap-month-select', K_EN_MONTHLIST, month, (m)=> loadENSwapsPanel(m));
-  const { roster, assignments, swaps } = await getENBundle_(month);
+  const { roster, assignments, swaps, dayTypes, released } = await getENBundle_(month);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
+  const permCfg = permCfg_('en');
+  permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
+  permSetup_(permCfg, month, roster, assignments, dayTypes, released);
 
   document.getElementById('en-swap-propose-card').style.display = (isAdmin || isSupervisor || !isCurrentMonth) ? 'none' : 'block';
   if(!isAdmin && !isSupervisor && isCurrentMonth){
@@ -6494,6 +6791,7 @@ async function loadENSwapsPanel(month){
       const day = daySelect.value;
       const toName = targetSelect.value;
       if(!day || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia e a pessoa.'; return; }
+      if(await permIsReleasedFresh_(permCfg.relKey, month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
       const fresh = await getENSwaps(month);
       fresh.push({ id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
       await setENSwaps(month, fresh);
@@ -6575,7 +6873,7 @@ async function enSwapRespond_(id, accept){
   req.respondedAt = new Date().toISOString();
   await setENSwaps(month, list);
   logEvent('preenchimento', currentUserName, (accept ? 'Aceitou' : 'Recusou') + ' a troca do dia ' + req.day + ' proposta por ' + req.fromName + ' (Adm Comitê El Niño)');
-  if(accept) backendNotifySwapPendingAdmin('cemaden', 'Adm Comitê El Niño', req.month || month, req.day, req.fromName, req.toName);
+  if(accept) backendNotifySwapPendingAdmin('cemaden', 'Adm Comitê El Niño', req.month || month, req.day, req.fromName, req.toName, req.dayB);
   await loadENSwapsPanel(month);
 }
 
@@ -6596,10 +6894,16 @@ async function enSwapDecide_(id, approve){
   const list = await getENSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadENSwapsPanel(month); return; }
-  if(approve){
+  if(approve && req.kind === 'permuta'){
+    await ensureOriginalSchedule_('elnino', month);
+    const outcome = await permApprove_(permCfg_('en'), req, month);
+    if(outcome === null) return; // admin desistiu — pedido continua aguardando decisão
+  } else if(approve){
     await ensureOriginalSchedule_('elnino', month);
     const assignments = await getENAssignments(month);
     const slots = assignments[req.day] || [];
+    const consecWarn = cessaoConsecWarn_(assignments, req.toName, req.day);
+    if(consecWarn && !(await askConfirm('⚠️ Atenção:\n' + consecWarn + '\nAprovar a cessão mesmo assim?'))) return; // admin desistiu — pedido continua aguardando decisão
     const idx = slots.indexOf(req.fromName);
     if(idx === -1 || slots.includes(req.toName)){
       req.status = 'erro_ao_aplicar';
@@ -6629,6 +6933,7 @@ async function enSwapUndo_(id, month){
   const list = await getENSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aprovada') { await loadENSwapsPanel(month); return; }
+  if(req.kind === 'permuta'){ await permUndo_(permCfg_('en'), req, list, month); return; }
   const confirmed = await askConfirm('Desfazer esta troca? O dia ' + req.day + ' volta a ficar com ' + req.fromName + '.');
   if(!confirmed) return;
   const assignments = await getENAssignments(month);
@@ -7497,6 +7802,9 @@ async function loadNSwapsPanel(month){
     if(r.kind === 'permuta' && (r.status === 'aguardando_admin' || r.status === 'aguardando_destino')){
       r._warn = nPermutaWarn_(r, assignments, dayTypes, month);
     }
+    if(!r.kind && (r.status === 'aguardando_admin' || r.status === 'aguardando_destino')){
+      r._warn = cessaoConsecWarn_(assignments, r.toName, r.day);
+    }
     if(r.kind === 'troca_tipo' && r.status === 'aguardando_admin'){
       const t = nTipoInfo_(r, assignments, dayTypes, month);
       r._warn = t.warn;
@@ -7505,6 +7813,7 @@ async function loadNSwapsPanel(month){
   });
 
   document.getElementById('n-swap-propose-card').style.display = (isAdmin || isSupervisor || !isCurrentMonth) ? 'none' : 'block';
+  if(!isAdmin && !isSupervisor && isCurrentMonth){ nSetCardLock_(document.getElementById('n-swap-propose-card'), released === true); cessaoWarnSetup_('n', assignments); }
   if(!isAdmin && !isSupervisor && isCurrentMonth){
     const myDays = Object.keys(assignments).filter(d=> nSlotNames_(assignments[d]).includes(currentUserName)).sort((a,b)=>Number(a)-Number(b));
     const daySelect = document.getElementById('n-swap-day-select');
@@ -7528,6 +7837,7 @@ async function loadNSwapsPanel(month){
       const day = daySelect.value;
       const toName = targetSelect.value;
       if(!day || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia e a pessoa.'; return; }
+      if(await nIsReleasedFresh_(month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
       const fresh = await getNSwaps(month);
       fresh.push({ id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
       await setNSwaps(month, fresh);
@@ -7658,6 +7968,8 @@ async function nSwapDecide_(id, approve){
     await ensureOriginalSchedule_('niiad', month);
     const assignments = await getNAssignments(month);
     const slots = assignments[req.day] || [];
+    const consecWarn = cessaoConsecWarn_(assignments, req.toName, req.day);
+    if(consecWarn && !(await askConfirm('⚠️ Atenção:\n' + consecWarn + '\nAprovar a cessão mesmo assim?'))) return; // admin desistiu — pedido continua aguardando decisão
     const idx = slots.findIndex(raw=> nSlotName_(raw) === req.fromName);
     if(idx === -1 || nSlotNames_(slots).includes(req.toName)){
       req.status = 'erro_ao_aplicar';
@@ -7759,6 +8071,10 @@ function nPermutaCheck_(assignments, dayTypes, month, nameA, dayX, nameB, dayY, 
   const warns = [];
   if(tA && nDayType(dayTypes, month, dayY) === 'vermelho') warns.push(nameA + ' ficaria com Ordinário (ORD) no dia ' + dayY + ', que é vermelho.');
   if(tB && nDayType(dayTypes, month, dayX) === 'vermelho') warns.push(nameB + ' ficaria com Ordinário (ORD) no dia ' + dayX + ', que é vermelho.');
+  const nbA = consecNeighbors_(assignments, nameA, dayY, dayX);
+  const nbB = consecNeighbors_(assignments, nameB, dayX, dayY);
+  if(nbA.length) warns.push(consecWarnText_(nameA, dayY, nbA));
+  if(nbB.length) warns.push(consecWarnText_(nameB, dayX, nbB));
   return { ok:true, tA, tB, warns };
 }
 
