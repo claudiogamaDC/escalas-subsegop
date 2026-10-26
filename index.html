@@ -119,6 +119,7 @@
   td.st-ferias{background:var(--c-ferias-bg);color:var(--c-ferias);font-weight:700;font-size:11px;}
   td.st-folga{background:var(--c-folga-bg);color:var(--c-folga);font-weight:700;font-size:11px;}
   td.st-externa{background:var(--c-externa-bg);color:var(--c-externa);font-weight:700;font-size:11px;}
+  td.st-servico-outro{background:#c084fc;color:#3b0764;font-weight:700;font-size:10px;line-height:1.15;}
   td.td-assigned{background:var(--c-expediente-bg);color:var(--c-expediente);font-weight:700;}
   .legend-box{border:1px solid #e2e8f0;padding:10px 16px;font-size:12px;color:#334155;display:flex;gap:18px;align-items:center;flex-wrap:wrap;}
   .legend-item{display:flex;align-items:center;gap:6px;}
@@ -577,6 +578,7 @@
       <span class="legend-item"><span class="legend-swatch" style="background:var(--c-ferias)"></span> Férias</span>
       <span class="legend-item"><span class="legend-swatch" style="background:var(--c-folga)"></span> Folga</span>
       <span class="legend-item"><span class="legend-swatch" style="background:var(--c-externa)"></span> Atividade Externa</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:#c084fc"></span> Serviço em outro setor (NIIAD/CEMADEN/El Niño)</span>
     </div>
     <div class="obs-row" id="fe-obs-row"></div>
   </div>
@@ -3351,7 +3353,12 @@ const STATUS = {
   servico:  {label:"Serviço",  cls:"st-servico",  symbol:"✓"},
   ferias:   {label:"Férias",   cls:"st-ferias",   symbol:"FÉRIAS"},
   folga:    {label:"Folga",    cls:"st-folga",    symbol:"FOLGA"},
-  externa:  {label:"Ativ. Externa", cls:"st-externa", symbol:"EXTERNA"}
+  externa:  {label:"Ativ. Externa", cls:"st-externa", symbol:"EXTERNA"},
+  // Vindos automaticamente das escalas mensais (ver servicosSemana_); nunca são gravados nas escolhas.
+  servico_subsegop: {label:"Serviço",         cls:"st-servico",       symbol:"✓"},
+  servico_niiad:    {label:"Serviço NIIAD",   cls:"st-servico-outro", symbol:"Serviço<br>NIIAD"},
+  servico_cemaden:  {label:"Serviço CEMADEN", cls:"st-servico-outro", symbol:"Serviço<br>CEMADEN"},
+  servico_elnino:   {label:"Serviço El Niño", cls:"st-servico-outro", symbol:"Serviço<br>El Niño"}
 };
 const K_ROSTER = "roster";
 const K_WEEK = "week_start";
@@ -3462,9 +3469,69 @@ async function setActiveDays(arr){
 // status — antes, CADA clique em Expediente/Serviço/Férias/Folga/Externa
 // disparava 4 chamadas ao backend só pra redesenhar a prévia.
 let expedienteCache_ = null;
+// Serviços das escalas mensais aplicados por cima do expediente (como as férias,
+// nunca gravados): SUBSEGOP Serviço Mensal vira "Serviço"; NIIAD, CEMADEN e El
+// Niño viram "Serviço <setor>" (roxo). Vale mais que férias e que a escolha
+// manual. A escala do mês seguinte entra mesmo antes de fechada. Casa por nome.
+const SERVICO_FONTES_ = [
+  ['servico_subsegop', ()=> K_S_ASSIGN],
+  ['servico_niiad',    ()=> K_N_ASSIGN],
+  ['servico_cemaden',  ()=> K_C_ASSIGN],
+  ['servico_elnino',   ()=> K_EN_ASSIGN]
+];
+function servicoMonthsAround_(){
+  const cur = currentMonthISO_();
+  const [y, m] = cur.split('-').map(Number);
+  const prev = new Date(y, m - 2, 1);
+  return [prev.getFullYear() + '-' + String(prev.getMonth() + 1).padStart(2, '0'), cur, nextMonthISO_(cur)];
+}
+function servicoKeys_(months){
+  const keys = [];
+  months.forEach(mo=> SERVICO_FONTES_.forEach(f=> keys.push(monthKey_(f[1](), mo))));
+  return keys;
+}
+function servicosSemana_(batch, dates){
+  const out = {};
+  if(!dates || !dates.length) return out;
+  ALL_DAYS.forEach((day, i)=>{
+    if(!dates[i]) return;
+    const iso = feriasIso_(dates[i]);
+    const month = iso.slice(0, 7), dayKey = String(Number(iso.slice(8, 10)));
+    for(const [status, keyFn] of SERVICO_FONTES_){
+      const assign = parseBatchValue_(batch, monthKey_(keyFn(), month), {}) || {};
+      (assign[dayKey] || []).forEach(raw=>{
+        const name = slotNameOf_(raw);
+        if(!name) return;
+        const mine = (out[name] = out[name] || {});
+        if(!mine[day]) mine[day] = status; // ordem de SERVICO_FONTES_ = prioridade
+      });
+    }
+  });
+  return out;
+}
+function mergeServicos_(choices, servicos){
+  const out = Object.assign({}, choices);
+  Object.keys(servicos || {}).forEach(name=>{ out[name] = Object.assign({}, out[name] || {}, servicos[name]); });
+  return out;
+}
+// Dias bloqueados de uma pessoa (férias + serviços; serviço vale mais).
+function expedienteLocks_(bundle, dates, name){
+  return Object.assign({}, (name && feriasMap_(bundle.ferias, dates)[name]) || {}, (name && (bundle.servicos || {})[name]) || {});
+}
 async function getExpedienteBundle_(){
-  const batch = await window.storage.getBatch([K_WEEK, K_RELEASED, K_ROSTER, K_CHOICES, K_ACTIVE_DAYS, K_OBS, K_FERIAS]);
+  const keys = [K_WEEK, K_RELEASED, K_ROSTER, K_CHOICES, K_ACTIVE_DAYS, K_OBS, K_FERIAS];
+  const around = servicoMonthsAround_();
+  const batch = await window.storage.getBatch(keys.concat(servicoKeys_(around)));
+  // Semana fora de [mês anterior, atual, seguinte]: busca à parte os meses que faltam.
+  const ws = parseBatchValue_(batch, K_WEEK, null);
+  const wd = getWeekDates(ws);
+  const extra = [...new Set(wd.map(d=> feriasIso_(d).slice(0, 7)))].filter(mo=> !around.includes(mo));
+  if(extra.length){
+    const more = await window.storage.getBatch(servicoKeys_(extra));
+    Object.assign(batch, more);
+  }
   const bundle = {
+    servicos: servicosSemana_(batch, wd),
     weekStart: parseBatchValue_(batch, K_WEEK, null),
     released: parseBatchValue_(batch, K_RELEASED, false) === true,
     roster: parseBatchValue_(batch, K_ROSTER, DEFAULT_ROSTER),
@@ -3479,7 +3546,7 @@ async function getExpedienteBundle_(){
 
 /* ---------- SUBSEGOP: aba Marcar ---------- */
 async function loadFillPanel(){
-  const { weekStart, released, roster, activeDays, ferias } = await getExpedienteBundle_();
+  const { weekStart, released, roster, activeDays, ferias, servicos } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
   const bannerEl = document.getElementById('week-banner-range');
   if(bannerEl){
@@ -3543,7 +3610,7 @@ async function loadFillPanel(){
     if(isActive){
       row.innerHTML = `<span class="day-label">${day}</span>
         <div class="status-btns" data-day="${day}">${isWeekend ? WEEKEND_STATUS_BTNS : ALL_STATUS_BTNS}</div>
-        <span class="ferias-lock-tag" data-day="${day}" style="display:none;font-size:12px;font-weight:600;color:#fecdd3;">🏖️ Férias (período registrado)</span>`;
+        <span class="ferias-lock-tag" data-day="${day}" style="display:none;font-size:12px;font-weight:600;color:var(--text);">🏖️ Férias (período registrado)</span>`;
     } else {
       row.innerHTML = `<span class="day-label">${day}</span>
         <span class="holiday-tag">Sem expediente (feriado/facultativo)</span>`;
@@ -3570,13 +3637,18 @@ async function loadFillPanel(){
   // Dias cobertos por um período de férias da pessoa escolhida: sem botões
   // (a escala já mostra Férias) e fora do que é salvo na semana.
   const applyFeriasLocks_ = (name)=>{
-    const lockedMap = (name && feriasMap_(ferias, dates)[name]) || {};
+    const lockedMap = expedienteLocks_(expedienteCache_ || { ferias, servicos }, dates, name);
     rowsWrap.querySelectorAll('.status-btns').forEach(group=>{
       const day = group.dataset.day;
       const locked = !!lockedMap[day];
       group.style.display = locked ? 'none' : '';
       const tag = rowsWrap.querySelector('.ferias-lock-tag[data-day="' + day + '"]');
-      if(tag) tag.style.display = locked ? '' : 'none';
+      if(tag){
+        tag.style.display = locked ? '' : 'none';
+        if(locked) tag.innerHTML = lockedMap[day] === 'ferias'
+          ? '🏖️ Férias (período registrado)'
+          : '🛡️ ' + STATUS[lockedMap[day]].label + ' (escala do mês)';
+      }
       if(locked){
         currentSelection[day] = null;
         group.querySelectorAll('.status-btn').forEach(b=> b.classList.remove('active'));
@@ -3628,11 +3700,11 @@ function expedienteTableHtml_(roster, view, dayEntries, highlightName){
       const isCurrent = !!highlightName && p.name === highlightName;
       html += `<tr${isCurrent ? ' style="box-shadow:inset 0 0 0 2px var(--accent);"' : ''}><td class="nome-c">${displayName_(p)}${isCurrent?' <span style="color:#3b82f6;font-size:10px;">(você)</span>':''}</td>`;
       dayEntries.forEach(e=>{
-        if(!e.active){
+        const st = (view[p.name]||{})[e.day];
+        if(!e.active && !(st && st.indexOf('servico_') === 0)){
           html += `<td class="td-holiday">—</td>`;
           return;
         }
-        const st = (view[p.name]||{})[e.day];
         if(st && STATUS[st]){
           html += `<td class="${STATUS[st].cls}">${STATUS[st].symbol}</td>`;
         } else {
@@ -3656,7 +3728,7 @@ async function updatePreview(){
   // vez de buscar tudo de novo — updatePreview() roda a cada clique num
   // botão de status, então isso é o que mais evita chamadas ao servidor.
   const bundle = expedienteCache_ || await getExpedienteBundle_();
-  const { roster, choices, weekStart, activeDays, ferias, obs } = bundle;
+  const { roster, choices, weekStart, activeDays, ferias, obs, servicos } = bundle;
   const dates = getWeekDates(weekStart);
   const dayEntries = buildDayEntries(dates, activeDays);
   const table = document.getElementById('preview-table');
@@ -3666,7 +3738,7 @@ async function updatePreview(){
   if(name){
     merged[name] = {...(merged[name]||{}), ...currentSelection};
   }
-  const view = mergeFerias_(merged, ferias, dates); // Férias por período aplicadas por cima
+  const view = mergeServicos_(mergeFerias_(merged, ferias, dates), servicos); // Férias e serviços aplicados por cima
   table.innerHTML = expedienteTableHtml_(roster, view, dayEntries, name);
 
   // Cabeçalho da escala: período, contador (só o que já foi salvo) e observações.
@@ -3693,9 +3765,9 @@ document.getElementById('fe-refresh-btn').onclick = async ()=>{
 // PNG: sempre com os dados já salvos (mesma foto da antiga Escala Expediente),
 // não com as marcações ainda não salvas da prévia.
 document.getElementById('fe-export-btn').onclick = async ()=>{
-  const { roster, choices: rawChoices, weekStart, activeDays, ferias, obs } = await getExpedienteBundle_();
+  const { roster, choices: rawChoices, weekStart, activeDays, ferias, obs, servicos } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
-  const view = mergeFerias_(rawChoices, ferias, dates);
+  const view = mergeServicos_(mergeFerias_(rawChoices, ferias, dates), servicos);
   const dayEntries = buildDayEntries(dates, activeDays);
   const src = document.getElementById('fe-schedule-wrap');
   const clone = src.cloneNode(true);
@@ -3742,7 +3814,7 @@ document.getElementById('save-btn').onclick = async ()=>{
     const activeDays = parseBatchValue_(freshBatch, K_ACTIVE_DAYS, [...DAYS]);
     let autoFilled = false;
     const feriasBundle = expedienteCache_ || await getExpedienteBundle_();
-    const lockedNow = feriasMap_(feriasBundle.ferias, getWeekDates(feriasBundle.weekStart))[name] || {};
+    const lockedNow = expedienteLocks_(feriasBundle, getWeekDates(feriasBundle.weekStart), name);
     ALL_DAYS.forEach(day=>{
       const isWeekend = WEEKEND_DAYS.includes(day);
       const isActive = isWeekend || activeDays.includes(day);
@@ -3934,9 +4006,9 @@ async function downloadXLSX_(filename, sheetName, rows){
 }
 
 const exportExpedienteXlsx_ = async ()=>{
-  const { roster, choices: rawChoices, weekStart, activeDays, ferias } = await getExpedienteBundle_();
+  const { roster, choices: rawChoices, weekStart, activeDays, ferias, servicos } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
-  const choices = mergeFerias_(rawChoices, ferias, dates);
+  const choices = mergeServicos_(mergeFerias_(rawChoices, ferias, dates), servicos);
   const dayEntries = buildDayEntries(dates, activeDays);
 
   const header = ['Categoria', 'Nome', ...dayEntries.map(e =>
@@ -3946,7 +4018,8 @@ const exportExpedienteXlsx_ = async ()=>{
   sortByRank_(roster).forEach(p=>{
     const row = [p.cat, displayName_(p)];
     dayEntries.forEach(e=>{
-      if(!e.active){ row.push('—'); return; }
+      const st0 = (choices[p.name]||{})[e.day];
+      if(!e.active && !(st0 && st0.indexOf('servico_') === 0)){ row.push('—'); return; }
       const st = (choices[p.name]||{})[e.day];
       row.push(st && STATUS[st] ? STATUS[st].label : '');
     });
