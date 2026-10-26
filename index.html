@@ -458,7 +458,6 @@
     <div class="tab-group-label">SUBSEGOP</div>
     <div class="tab-group-row">
       <div class="tab tab-grp-expediente" data-panel="fill-subsegop" data-group="subsegop">Meus Expedientes</div>
-      <div class="tab tab-grp-expediente" data-panel="compiled-subsegop" data-group="subsegop">Escala Expediente</div>
       <div class="tab tab-grp-expediente" data-panel="admin-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Configurar SUBSEGOP</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="fill-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Escolher Serviços</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="compiled-subsegop-serv" data-group="subsegop">Escala Compilada SUBSEGOP</div>
@@ -532,7 +531,7 @@
     <span style="width:10px;height:10px;border-radius:50%;background:#ef4444;display:inline-block;flex:none;"></span>
   </div>
 
-  <div class="card">
+  <div class="card" id="fill-form-card">
     <label>Selecione seu nome</label>
     <select id="name-select"></select>
 
@@ -559,25 +558,18 @@
     <a href="#" id="ferias-toggle-old" style="display:none;font-size:12px;color:var(--muted);"></a>
   </div>
 
-  <div class="card" style="margin-top:16px;">
-    <label style="margin-top:0;">Prévia da escala (com as escolhas já feitas pelos demais)</label>
-    <div id="preview-wrap" style="background:#ffffff;border-radius:8px;overflow:hidden;">
-      <table class="sched" id="preview-table" style="font-size:12px;"></table>
-    </div>
-  </div>
-</div>
-
-<!-- ======================= SUBSEGOP: COMPILADA ======================= -->
-<div class="panel" id="panel-compiled-subsegop">
-  <div class="count-badge" id="count-badge">Carregando...</div>
+  <div class="count-badge" id="fe-count-badge" style="margin-top:16px;">Carregando...</div>
   <div class="toolbar">
-    <button class="primary" id="export-btn">Baixar como imagem (PNG)</button>
-    <button id="export-csv-btn">Baixar como Excel (XLSX)</button>
-    <button id="refresh-btn">Atualizar</button>
+    <button class="primary" id="fe-export-btn">Baixar como imagem (PNG)</button>
+    <button id="fe-export-csv-btn">Baixar como Excel (XLSX)</button>
+    <button id="fe-refresh-btn">Atualizar</button>
   </div>
-  <div class="schedule-wrap" id="schedule-wrap">
-    <div class="schedule-title">ESCALA DE EXPEDIENTE — <span id="range-label"></span></div>
-    <table class="sched" id="sched-table"></table>
+  <p id="fe-preview-note" style="font-size:11px;color:var(--muted);margin:-6px 0 10px;">A tabela mostra também as suas marcações ainda não salvas. PNG e Excel saem só com o que já foi salvo.</p>
+  <div class="schedule-wrap" id="fe-schedule-wrap">
+    <div class="schedule-title">ESCALA DE EXPEDIENTE — <span id="fe-range-label"></span></div>
+    <div id="preview-wrap">
+      <table class="sched" id="preview-table"></table>
+    </div>
     <div class="legend-box">
       <strong style="margin-right:4px;">Legenda:</strong>
       <span class="legend-item"><span class="legend-swatch" style="background:var(--c-expediente)"></span> Expediente</span>
@@ -586,7 +578,7 @@
       <span class="legend-item"><span class="legend-swatch" style="background:var(--c-folga)"></span> Folga</span>
       <span class="legend-item"><span class="legend-swatch" style="background:var(--c-externa)"></span> Atividade Externa</span>
     </div>
-    <div class="obs-row" id="obs-row"></div>
+    <div class="obs-row" id="fe-obs-row"></div>
   </div>
 </div>
 
@@ -2827,7 +2819,7 @@ function applyRoleVisibility(){
       // Supervisão só consulta: escalas compiladas e trocas do próprio setor,
       // nunca telas de preenchimento nem "Configurar".
       const panel = tab.dataset.panel || '';
-      const readOnlyPanel = panel.indexOf('compiled-') === 0 || panel.indexOf('swaps-') === 0;
+      const readOnlyPanel = panel.indexOf('compiled-') === 0 || panel.indexOf('swaps-') === 0 || panel === 'fill-subsegop';
       visible = !adminOnly && group && currentGroups.includes(group) && readOnlyPanel;
     } else if(isGestor){
       // Gestor só enxerga a Visão do Dia — nenhuma aba de setor nenhum.
@@ -3318,7 +3310,6 @@ setTimeout(function resumeSession(){
 
 function loadPanel(name){
   if(name === 'fill-subsegop') loadFillPanel();
-  else if(name === 'compiled-subsegop') loadCompiled();
   else if(name === 'admin-subsegop') loadRosterPanel();
   else if(name === 'fill-subsegop-serv') loadSFillPanel();
   else if(name === 'fill-subsegop-serv-next') loadSFillPanelNext_();
@@ -3509,6 +3500,17 @@ async function loadFillPanel(){
   const select = document.getElementById('name-select');
   const canActAsOthers = currentRole === 'admin' || currentLevels.subsegop === 'responsavel';
 
+  // Supervisão só consulta: vê a escala e as férias, sem formulário de marcar dias.
+  if(currentRole === 'supervisor'){
+    document.getElementById('fill-form-card').style.display = 'none';
+    releaseBanner.style.display = 'none';
+    select.innerHTML = '';
+    renderFeriasCard_(false, roster, async ()=>{ await updatePreview(); });
+    await updatePreview();
+    return;
+  }
+  document.getElementById('fill-form-card').style.display = '';
+
   if(canActAsOthers){
     select.innerHTML = '<option value="">-- selecione --</option>' +
       sortByRank_(roster).map(p=>`<option value="${p.name}">${displayName_(p)}</option>`).join('');
@@ -3613,34 +3615,17 @@ async function loadFillPanel(){
   }
 }
 
-async function updatePreview(){
-  const select = document.getElementById('name-select');
-  const name = select ? select.value : '';
-  // Reaproveita o que já foi buscado quando a aba abriu (loadFillPanel) em
-  // vez de buscar tudo de novo — updatePreview() roda a cada clique num
-  // botão de status, então isso é o que mais evita chamadas ao servidor.
-  const bundle = expedienteCache_ || await getExpedienteBundle_();
-  const { roster, choices, weekStart, activeDays, ferias } = bundle;
-  const dates = getWeekDates(weekStart);
-  const dayEntries = buildDayEntries(dates, activeDays);
-  const table = document.getElementById('preview-table');
-  if(!table) return;
-
-  const merged = {...choices};
-  if(name){
-    merged[name] = {...(merged[name]||{}), ...currentSelection};
-  }
-  const view = mergeFerias_(merged, ferias, dates); // Férias por período aplicadas por cima
-
+// Monta o miolo (thead+tbody) da tabela de expediente — usado pela prévia da
+// tela e pela exportação em PNG. `highlightName` marca a linha "(você)".
+function expedienteTableHtml_(roster, view, dayEntries, highlightName){
   let html = '<thead><tr><th class="nome-h">Nome</th>';
-  dayEntries.forEach(e=> html += `<th class="${dayThClass(e)}">${e.day}<br><span style="font-weight:400;font-size:10px">${e.active ? (e.date?fmtDate(e.date):'') : 'Feriado'}</span></th>`);
+  dayEntries.forEach(e=> html += `<th class="${dayThClass(e)}">${e.day}<br><span style="font-weight:400;font-size:11px">${e.active ? (e.date?fmtDate(e.date):'') : 'Feriado'}</span></th>`);
   html += '</tr></thead><tbody>';
-
   const cats = ["OFICIAIS","PRAÇAS"].filter(c=> roster.some(p=>p.cat===c));
   cats.forEach(cat=>{
     html += `<tr class="cat-row ${cat==='PRAÇAS'?'praca':''}"><td colspan="${dayEntries.length+1}">▶ ${cat}</td></tr>`;
     sortByRank_(roster.filter(p=>p.cat===cat)).forEach(p=>{
-      const isCurrent = p.name === name;
+      const isCurrent = !!highlightName && p.name === highlightName;
       html += `<tr${isCurrent ? ' style="box-shadow:inset 0 0 0 2px var(--accent);"' : ''}><td class="nome-c">${displayName_(p)}${isCurrent?' <span style="color:#3b82f6;font-size:10px;">(você)</span>':''}</td>`;
       dayEntries.forEach(e=>{
         if(!e.active){
@@ -3657,9 +3642,80 @@ async function updatePreview(){
       html += '</tr>';
     });
   });
-  html += '</tbody>';
-  table.innerHTML = html;
+  return html + '</tbody>';
 }
+
+function expedienteCanExport_(){
+  return currentRole === 'admin' || currentLevels.subsegop === 'responsavel';
+}
+
+async function updatePreview(){
+  const select = document.getElementById('name-select');
+  const name = select ? select.value : '';
+  // Reaproveita o que já foi buscado quando a aba abriu (loadFillPanel) em
+  // vez de buscar tudo de novo — updatePreview() roda a cada clique num
+  // botão de status, então isso é o que mais evita chamadas ao servidor.
+  const bundle = expedienteCache_ || await getExpedienteBundle_();
+  const { roster, choices, weekStart, activeDays, ferias, obs } = bundle;
+  const dates = getWeekDates(weekStart);
+  const dayEntries = buildDayEntries(dates, activeDays);
+  const table = document.getElementById('preview-table');
+  if(!table) return;
+
+  const merged = {...choices};
+  if(name){
+    merged[name] = {...(merged[name]||{}), ...currentSelection};
+  }
+  const view = mergeFerias_(merged, ferias, dates); // Férias por período aplicadas por cima
+  table.innerHTML = expedienteTableHtml_(roster, view, dayEntries, name);
+
+  // Cabeçalho da escala: período, contador (só o que já foi salvo) e observações.
+  document.getElementById('fe-range-label').textContent =
+    dates.length ? `${fmtDate(dates[0])} a ${fmtDate(dates[6])}/${dates[6].getFullYear()}` : 'semana não configurada';
+  const saved = mergeFerias_(choices, ferias, dates);
+  const filledCount = Object.keys(saved).filter(n=>Object.values(saved[n]||{}).some(v=>v)).length;
+  document.getElementById('fe-count-badge').textContent = filledCount + ' de ' + roster.length + ' já preencheram';
+  document.getElementById('fe-obs-row').textContent = obs || '';
+  const canExport = expedienteCanExport_();
+  document.getElementById('fe-export-btn').style.display = canExport ? '' : 'none';
+  document.getElementById('fe-export-csv-btn').style.display = canExport ? '' : 'none';
+  const note = document.getElementById('fe-preview-note');
+  if(note) note.style.display = (currentRole === 'supervisor') ? 'none' : '';
+}
+
+// Atualizar: busca de novo do servidor e redesenha, mantendo as marcações
+// ainda não salvas de quem está na tela (currentSelection não é mexido).
+document.getElementById('fe-refresh-btn').onclick = async ()=>{
+  await getExpedienteBundle_();
+  await updatePreview();
+};
+
+// PNG: sempre com os dados já salvos (mesma foto da antiga Escala Expediente),
+// não com as marcações ainda não salvas da prévia.
+document.getElementById('fe-export-btn').onclick = async ()=>{
+  const { roster, choices: rawChoices, weekStart, activeDays, ferias, obs } = await getExpedienteBundle_();
+  const dates = getWeekDates(weekStart);
+  const view = mergeFerias_(rawChoices, ferias, dates);
+  const dayEntries = buildDayEntries(dates, activeDays);
+  const src = document.getElementById('fe-schedule-wrap');
+  const clone = src.cloneNode(true);
+  clone.querySelectorAll('[id]').forEach(el=> el.removeAttribute('id'));
+  clone.querySelector('table.sched').innerHTML = expedienteTableHtml_(roster, view, dayEntries, null);
+  clone.querySelector('.obs-row').textContent = obs || '';
+  clone.style.cssText = 'position:fixed;left:-10000px;top:0;width:900px;max-width:900px;overflow:visible;';
+  document.body.appendChild(clone);
+  try{
+    const canvas = await html2canvas(clone, {backgroundColor:'#ffffff', scale:2});
+    const link = document.createElement('a');
+    link.download = 'escala_subsegop_' + new Date().toISOString().slice(0,10) + '.png';
+    link.href = canvas.toDataURL('image/png');
+    link.click();
+  } finally {
+    clone.remove();
+  }
+  await updatePreview();
+};
+document.getElementById('fe-export-csv-btn').onclick = ()=> exportExpedienteXlsx_();
 
 document.getElementById('save-btn').onclick = async ()=>{
   const name = document.getElementById('name-select').value;
@@ -3838,64 +3894,6 @@ function renderFeriasCard_(canManage, roster, afterChange){
   };
 }
 
-/* ---------- SUBSEGOP: aba Compilada ---------- */
-document.getElementById('refresh-btn').onclick = loadCompiled;
-
-async function loadCompiled(){
-  const canExport = currentRole === 'admin' || currentLevels.subsegop === 'responsavel';
-  document.getElementById('export-btn').style.display = canExport ? '' : 'none';
-  document.getElementById('export-csv-btn').style.display = canExport ? '' : 'none';
-  const { roster, choices: rawChoices, weekStart, obs, activeDays, ferias } = await getExpedienteBundle_();
-  const dates = getWeekDates(weekStart);
-  const choices = mergeFerias_(rawChoices, ferias, dates);
-  const dayEntries = buildDayEntries(dates, activeDays);
-
-  document.getElementById('range-label').textContent =
-    dates.length ? `${fmtDate(dates[0])} a ${fmtDate(dates[6])}/${dates[6].getFullYear()}` : 'semana não configurada';
-
-  const filledCount = Object.keys(choices).filter(n=>Object.values(choices[n]||{}).some(v=>v)).length;
-  document.getElementById('count-badge').textContent = filledCount + ' de ' + roster.length + ' já preencheram';
-
-  const table = document.getElementById('sched-table');
-  let html = '<thead><tr><th class="nome-h">Nome</th>';
-  dayEntries.forEach(e=> html += `<th class="${dayThClass(e)}">${e.day}<br><span style="font-weight:400;font-size:11px">${e.active ? (e.date?fmtDate(e.date):'') : 'Feriado'}</span></th>`);
-  html += '</tr></thead><tbody>';
-
-  const cats = ["OFICIAIS","PRAÇAS"].filter(c=> roster.some(p=>p.cat===c));
-  cats.forEach(cat=>{
-    html += `<tr class="cat-row ${cat==='PRAÇAS'?'praca':''}"><td colspan="${dayEntries.length+1}">▶ ${cat}</td></tr>`;
-    sortByRank_(roster.filter(p=>p.cat===cat)).forEach(p=>{
-      html += `<tr><td class="nome-c">${displayName_(p)}</td>`;
-      dayEntries.forEach(e=>{
-        if(!e.active){
-          html += `<td class="td-holiday">—</td>`;
-          return;
-        }
-        const st = (choices[p.name]||{})[e.day];
-        if(st && STATUS[st]){
-          html += `<td class="${STATUS[st].cls}">${STATUS[st].symbol}</td>`;
-        } else {
-          html += `<td class="${e.isWeekend?'td-weekend':''}"></td>`;
-        }
-      });
-      html += '</tr>';
-    });
-  });
-  html += '</tbody>';
-  table.innerHTML = html;
-
-  document.getElementById('obs-row').textContent = obs || '';
-}
-
-document.getElementById('export-btn').onclick = async ()=>{
-  const el = document.getElementById('schedule-wrap');
-  const canvas = await html2canvas(el, {backgroundColor:'#ffffff', scale:2});
-  const link = document.createElement('a');
-  link.download = 'escala_subsegop_' + new Date().toISOString().slice(0,10) + '.png';
-  link.href = canvas.toDataURL('image/png');
-  link.click();
-};
-
 /* ---------- Exportação CSV (genérico, usado pelas duas escalas) ---------- */
 // Baixa uma planilha .xlsx a partir de uma matriz de linhas (mesmo formato
 // que já usávamos pro CSV) usando a biblioteca SheetJS carregada no <head>.
@@ -3935,7 +3933,7 @@ async function downloadXLSX_(filename, sheetName, rows){
   XLSX.writeFile(wb, filename);
 }
 
-document.getElementById('export-csv-btn').onclick = async ()=>{
+const exportExpedienteXlsx_ = async ()=>{
   const { roster, choices: rawChoices, weekStart, activeDays, ferias } = await getExpedienteBundle_();
   const dates = getWeekDates(weekStart);
   const choices = mergeFerias_(rawChoices, ferias, dates);
