@@ -9813,6 +9813,148 @@ async function loadVisaoDiaPanel(){
     };
   }
 }
+
+/* ===== Resumo cotas × dias do mês (Serviço Mensal, CEMADEN, El Niño, NIIAD) =====
+   Compara a soma das cotas do "Efetivo" (só quem está marcado) com a
+   quantidade de dias de cada tipo configurada em "Tipo de cada dia do mês".
+   Lê tudo do DOM, então acompanha qualquer edição sem mexer nos editores. */
+(function(){
+  const st = document.createElement('style');
+  st.textContent = `
+    .quota-summary{position:sticky;bottom:0;z-index:5;margin-top:12px;padding:10px 12px;background:var(--card2);border:1px solid var(--border);border-radius:10px;box-shadow:0 -4px 10px rgba(0,0,0,.18);}
+    .quota-summary-title{font-size:11px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin-bottom:6px;}
+    .qs-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;padding:4px 0;font-size:13px;color:var(--text);}
+    .qs-name{flex:0 0 78px;font-weight:600;}
+    .qs-num{flex:0 0 auto;color:var(--muted);}
+    .qs-num b{color:var(--text);}
+    .qs-badge{margin-left:auto;padding:2px 10px;border-radius:999px;font-size:12px;font-weight:700;}
+    .qs-ok{background:#bbf7d0;color:#14532d;}
+    .qs-warn{background:#fecaca;color:#7f1d1d;}
+    .qs-extra{background:#fef3c7;color:#78350f;}
+    .qs-detail{flex-basis:100%;font-size:11px;color:var(--muted);margin-top:-2px;}
+    .daytypes-count{margin-top:10px;font-size:12px;color:var(--muted);}
+    .daytypes-count b{color:var(--text);}
+    @media (max-width:520px){.qs-name{flex-basis:100%;}.qs-badge{margin-left:0;}}
+  `;
+  document.head.appendChild(st);
+
+  const TYPES = {
+    s:  [['preto','Preto'],['sexta','Sexta'],['vermelho','Vermelho']],
+    c:  [['preto','Preto'],['vermelho','Vermelho']],
+    en: [['preto','Preto'],['vermelho','Vermelho']],
+    n:  [['preto','Preto'],['vermelho','Vermelho']]
+  };
+  const PREFIXES = ['s','s-next','c','c-next','en','en-next','n','n-next'];
+
+  function supply_(sec, listEl){
+    const sum = {preto:0, sexta:0, vermelho:0, ordinario:0};
+    let people = 0;
+    listEl.querySelectorAll('.roster-row').forEach(row=>{
+      const chk = row.querySelector('.' + sec + '-participant-check');
+      if(!chk || !chk.checked) return;
+      people++;
+      Object.keys(sum).forEach(k=>{
+        const inp = row.querySelector('.' + sec + '-participant-quota-' + k);
+        if(inp) sum[k] += Number(inp.value) || 0;
+      });
+    });
+    return { sum, people };
+  }
+  function demand_(dayEl){
+    const d = {preto:0, sexta:0, vermelho:0, indisponivel:0};
+    dayEl.querySelectorAll('[data-day]').forEach(el=>{ if(el.dataset.type in d) d[el.dataset.type]++; });
+    return d;
+  }
+
+  // Devolve os desencontros atuais (usado pelo resumo e pelo aviso ao salvar).
+  function compute_(p){
+    const sec = p.split('-')[0];
+    const listEl = document.getElementById(p + '-participants-list');
+    const dayEl = document.getElementById(p + '-daytypes-list');
+    if(!listEl || !dayEl || !listEl.children.length || !dayEl.children.length) return null;
+    const { sum, people } = supply_(sec, listEl);
+    const dem = demand_(dayEl);
+    const rows = TYPES[sec].map(([key, label])=>{
+      // NIIAD: o Ordinário também é serviço de dia preto, então soma na oferta do preto.
+      const have = key === 'preto' && sec === 'n' ? sum.preto + sum.ordinario : sum[key];
+      const need = dem[key];
+      return { key, label, have, need, diff: have - need,
+        detail: key === 'preto' && sec === 'n' ? 'Ordinário ' + sum.ordinario + ' + Preta ' + sum.preto : '' };
+    });
+    const totHave = rows.reduce((a,r)=>a+r.have,0), totNeed = rows.reduce((a,r)=>a+r.need,0);
+    return { rows, people, totHave, totNeed, unavailable: dem.indisponivel };
+  }
+  function badge_(diff){
+    if(diff === 0) return '<span class="qs-badge qs-ok">✔ confere</span>';
+    if(diff < 0) return '<span class="qs-badge qs-warn">⚠ faltam ' + (-diff) + '</span>';
+    return '<span class="qs-badge qs-extra">⚠ sobram ' + diff + '</span>';
+  }
+
+  function render_(p){
+    const listEl = document.getElementById(p + '-participants-list');
+    const dayEl = document.getElementById(p + '-daytypes-list');
+    if(!listEl || !dayEl) return;
+    let bar = document.getElementById(p + '-quota-summary');
+    if(!bar){
+      bar = document.createElement('div');
+      bar.id = p + '-quota-summary';
+      bar.className = 'quota-summary';
+      listEl.after(bar);
+    }
+    let cnt = document.getElementById(p + '-daytypes-count');
+    if(!cnt){
+      cnt = document.createElement('div');
+      cnt.id = p + '-daytypes-count';
+      cnt.className = 'daytypes-count';
+      dayEl.after(cnt);
+    }
+    const r = compute_(p);
+    if(!r){ bar.style.display = 'none'; cnt.textContent = ''; return; }
+    bar.style.display = '';
+    const totDiff = r.totHave - r.totNeed;
+    bar.innerHTML = '<div class="quota-summary-title">Cotas do efetivo × dias do mês</div>' +
+      r.rows.map(x=>
+        '<div class="qs-row"><span class="qs-name">' + x.label + '</span>' +
+        '<span class="qs-num">Cotas <b>' + x.have + '</b></span>' +
+        '<span class="qs-num">Dias <b>' + x.need + '</b></span>' + badge_(x.diff) +
+        (x.detail ? '<span class="qs-detail">' + x.detail + '</span>' : '') + '</div>'
+      ).join('') +
+      '<div class="qs-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px;"><span class="qs-name">Total</span>' +
+      '<span class="qs-num">Cotas <b>' + r.totHave + '</b></span><span class="qs-num">Dias <b>' + r.totNeed + '</b></span>' +
+      badge_(totDiff) + '<span class="qs-detail">' + r.people + ' pessoa(s) marcada(s)' +
+      (r.unavailable ? ' · ' + r.unavailable + ' dia(s) indisponível(is) fora da conta' : '') + '</span></div>';
+    cnt.innerHTML = '<b>Resumo:</b> ' + r.rows.map(x=> x.need + ' ' + x.label.toLowerCase() + (x.need === 1 ? '' : 's')).join(' · ') +
+      (r.unavailable ? ' · ' + r.unavailable + ' indisponível(is)' : '');
+  }
+
+  const timers = {};
+  function schedule_(p){ clearTimeout(timers[p]); timers[p] = setTimeout(()=> render_(p), 0); }
+
+  PREFIXES.forEach(p=>{
+    const listEl = document.getElementById(p + '-participants-list');
+    const dayEl = document.getElementById(p + '-daytypes-list');
+    if(!listEl || !dayEl) return;
+    const mo = new MutationObserver(()=> schedule_(p));
+    mo.observe(listEl, { childList:true });
+    mo.observe(dayEl, { childList:true });
+    ['input','change'].forEach(ev=> listEl.addEventListener(ev, ()=> schedule_(p)));
+    dayEl.addEventListener('click', ()=> schedule_(p));
+
+    // Aviso ao salvar o efetivo quando as cotas não batem com os dias.
+    const btn = document.getElementById(p + '-save-participants-btn');
+    if(btn) btn.addEventListener('click', (e)=>{
+      const r = compute_(p);
+      if(!r) return;
+      const bad = r.rows.filter(x=> x.diff !== 0);
+      if(!bad.length) return;
+      const msg = 'As cotas não batem com os dias configurados para o mês:\n\n' +
+        bad.map(x=> '• ' + x.label + ': ' + x.have + ' cota(s) para ' + x.need + ' dia(s) — ' + (x.diff < 0 ? 'faltam ' + (-x.diff) : 'sobram ' + x.diff)).join('\n') +
+        '\n\nSalvar mesmo assim?';
+      if(!confirm(msg)) e.stopImmediatePropagation();
+    }, true);
+    schedule_(p);
+  });
+})();
 </script>
 
 
