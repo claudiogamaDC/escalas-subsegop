@@ -71,6 +71,8 @@
   .tab-grp-elnino-atual{border-left-color:#0ea5e9;}
   .tab-grp-proximo-fill{border-left-color:#a855f7;}
   .tab-grp-proximo-admin{border-left-color:#f59e0b;}
+  /* Abas "Configurar mês atual" (escolha de serviços pelo admin) — mesma cor nos 3 grupos. */
+  .tab-grp-mes-atual{border-left-color:#ec4899;}
   /* .tab.active define border-color (as 4 bordas) por cima — repete só a
      borda esquerda aqui, com especificidade maior, pra cor do grupo continuar
      visível mesmo na aba selecionada. */
@@ -82,6 +84,7 @@
   .tab.active.tab-grp-elnino-atual{border-left-color:#0ea5e9;}
   .tab.active.tab-grp-proximo-fill{border-left-color:#a855f7;}
   .tab.active.tab-grp-proximo-admin{border-left-color:#f59e0b;}
+  .tab.active.tab-grp-mes-atual{border-left-color:#ec4899;}
   .tab-group-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;font-weight:700;}
   .panel{display:none;}
   .panel.active{display:block;}
@@ -150,6 +153,7 @@
      tudo numa linha só, e com fundo acompanhando a cor do respectivo tipo
      de dia (preta=branco, sexta=rosa, vermelha=vermelho, ordinário=verde),
      igual ao resto do app. */
+  .roster-row input[type=number]:disabled{opacity:.45;cursor:not-allowed;}
   .roster-row input[type=number]{padding:8px 6px;border:1px solid var(--border);border-radius:8px;font-size:13px;text-align:center;min-width:0;}
   .roster-row .s-participant-quota-preto,
   .roster-row .c-participant-quota-preto,
@@ -480,7 +484,7 @@
       <div class="tab tab-grp-proximo" data-panel="fill-subsegop-serv-next" data-group="subsegop">Meus serviços — próximo mês</div>
       <div class="tab tab-grp-proximo" data-panel="admin-subsegop-serv-next" data-admin-only="true" data-admin-only-setor="subsegop">Montar mês seguinte</div>
       <div class="tab" data-panel="originais-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Escalas Originais</div>
-      <div class="tab tab-grp-subsegop-serv" data-panel="fill-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Escolher Serviços</div>
+      <div class="tab tab-grp-mes-atual" data-panel="fill-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar mês atual SUBSEGOP</div>
     </div>
   </div>
 
@@ -498,8 +502,8 @@
       <div class="tab tab-grp-proximo-admin" data-panel="admin-cemaden-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (CEMADEN)</div>
       <div class="tab tab-grp-proximo-admin" data-panel="admin-elnino-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (El Niño)</div>
       <div class="tab" data-panel="originais-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Escalas Originais</div>
-      <div class="tab tab-grp-cemaden-atual" data-panel="fill-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Escolher Serviços CEMADEN</div>
-      <div class="tab tab-grp-elnino-atual" data-panel="fill-elnino" data-admin-only="true" data-admin-only-setor="cemaden">Escolher Serviços El Niño</div>
+      <div class="tab tab-grp-mes-atual" data-panel="fill-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Configurar mês atual CEMADEN</div>
+      <div class="tab tab-grp-mes-atual" data-panel="fill-elnino" data-admin-only="true" data-admin-only-setor="cemaden">Configurar mês atual El Niño</div>
     </div>
   </div>
 
@@ -512,7 +516,7 @@
       <div class="tab tab-grp-proximo" data-panel="fill-niiad-next" data-group="niiad">Meus Serviços — próximo mês</div>
       <div class="tab tab-grp-proximo" data-panel="admin-niiad-next" data-admin-only="true" data-admin-only-setor="niiad">Montar mês seguinte</div>
       <div class="tab" data-panel="originais-niiad" data-admin-only="true" data-admin-only-setor="niiad">Escalas Originais</div>
-      <div class="tab tab-grp-atual" data-panel="fill-niiad" data-admin-only="true" data-admin-only-setor="niiad">Escolher Serviços</div>
+      <div class="tab tab-grp-mes-atual" data-panel="fill-niiad" data-admin-only="true" data-admin-only-setor="niiad">Configurar mês atual NIIAD</div>
     </div>
   </div>
 
@@ -2626,6 +2630,21 @@ async function permUndo_(cfg, req, list, month){
   await cfg.refreshCal(month).catch(()=>{});
 }
 
+// Linha de participante (Serviço Mensal/CEMADEN/El Niño/NIIAD): sem o nome
+// marcado, as cotas ficam desativadas (os valores são mantidos e voltam a ser
+// editáveis se a pessoa for marcada de novo; desmarcada, não é salva).
+function syncParticipantRow_(row){
+  const chk = row.querySelector('input[type=checkbox]');
+  if(!chk) return;
+  row.querySelectorAll('input[type=number]').forEach(inp=>{ inp.disabled = !chk.checked; });
+}
+document.addEventListener('change', (e)=>{
+  const t = e.target;
+  if(t && t.matches && t.matches('input[type=checkbox][class$="-participant-check"]')){
+    const row = t.closest('.roster-row');
+    if(row) syncParticipantRow_(row);
+  }
+});
 function swappedNamesByDay_(swaps){
   const byDay = {};
   (swaps||[]).forEach(r=>{
@@ -5301,6 +5320,7 @@ async function renderSParticipantsEditor(month, wrapId, preloadedParticipants, p
       <input type="number" min="0" value="${entry ? (Number(entry.quotaSexta)||0) : 0}" placeholder="Sexta" class="s-participant-quota-sexta" style="flex:0 0 62px;" title="Cota de sextas (RAS)">
       <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Verm." class="s-participant-quota-vermelho" style="flex:0 0 62px;" title="Cota de sáb/dom (RAS)">`;
     wrap.appendChild(row);
+    syncParticipantRow_(row);
   });
 }
 // Salva o container `wrapId` (quem está marcado + cotas) como participantes
@@ -6367,6 +6387,7 @@ async function renderCParticipantsEditor(month, wrapId, preloadedParticipants, p
       <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Preta" class="c-participant-quota-preto" style="flex:0 0 62px;" title="Cota de dias pretos">
       <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Verm." class="c-participant-quota-vermelho" style="flex:0 0 62px;" title="Cota de dias vermelhos (RAS)">`;
     wrap.appendChild(row);
+    syncParticipantRow_(row);
   });
 }
 // Salva o container `wrapId` (quem está marcado + cotas) como participantes
@@ -7477,6 +7498,7 @@ async function renderENParticipantsEditor(month, wrapId, preloadedParticipants, 
       <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Preta" class="en-participant-quota-preto" style="flex:0 0 62px;" title="Cota de dias pretos">
       <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Verm." class="en-participant-quota-vermelho" style="flex:0 0 62px;" title="Cota de dias vermelhos (RAS)">`;
     wrap.appendChild(row);
+    syncParticipantRow_(row);
   });
 }
 // Salva o container `wrapId` (quem está marcado + cotas) como participantes
@@ -8977,6 +8999,7 @@ async function renderNParticipantsEditor(month, wrapId, preloadedParticipants, p
       <input type="number" min="0" value="${entry ? (Number(entry.quotaPreto)||0) : 0}" placeholder="Preta" class="n-participant-quota-preto" style="flex:0 0 62px;" title="Cota de dias pretos">
       <input type="number" min="0" value="${entry ? (Number(entry.quotaVermelho)||0) : 0}" placeholder="Verm." class="n-participant-quota-vermelho" style="flex:0 0 62px;" title="Cota de dias vermelhos (RAS)">`;
     wrap.appendChild(row);
+    syncParticipantRow_(row);
   });
 }
 // Salva o container `wrapId` (quem está marcado + cotas) como participantes
