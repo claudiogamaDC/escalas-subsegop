@@ -9844,6 +9844,8 @@ async function loadVisaoDiaPanel(){
     en: [['preto','Preto'],['vermelho','Vermelho']],
     n:  [['preto','Preto'],['vermelho','Vermelho']]
   };
+  // Vagas por dia: o NIIAD tem 2 (slotHtml(0) e slotHtml(1)); os demais, 1.
+  const SLOTS_PER_DAY = { s:1, c:1, en:1, n:2 };
   const PREFIXES = ['s','s-next','c','c-next','en','en-next','n','n-next'];
 
   function supply_(sec, listEl){
@@ -9877,8 +9879,9 @@ async function loadVisaoDiaPanel(){
     const rows = TYPES[sec].map(([key, label])=>{
       // NIIAD: o Ordinário também é serviço de dia preto, então soma na oferta do preto.
       const have = key === 'preto' && sec === 'n' ? sum.preto + sum.ordinario : sum[key];
-      const need = dem[key];
-      return { key, label, have, need, diff: have - need,
+      const mult = SLOTS_PER_DAY[sec] || 1;
+      const days = dem[key], need = days * mult;
+      return { key, label, have, need, days, mult, diff: have - need,
         detail: key === 'preto' && sec === 'n' ? 'Ordinário ' + sum.ordinario + ' + Preta ' + sum.preto : '' };
     });
     const totHave = rows.reduce((a,r)=>a+r.have,0), totNeed = rows.reduce((a,r)=>a+r.need,0);
@@ -9916,14 +9919,14 @@ async function loadVisaoDiaPanel(){
       r.rows.map(x=>
         '<div class="qs-row"><span class="qs-name">' + x.label + '</span>' +
         '<span class="qs-num">Cotas <b>' + x.have + '</b></span>' +
-        '<span class="qs-num">Dias <b>' + x.need + '</b></span>' + badge_(x.diff) +
+        '<span class="qs-num">Dias <b>' + x.days + '</b>' + (x.mult > 1 ? ' × ' + x.mult + ' vagas = <b>' + x.need + '</b>' : '') + '</span>' + badge_(x.diff) +
         (x.detail ? '<span class="qs-detail">' + x.detail + '</span>' : '') + '</div>'
       ).join('') +
       '<div class="qs-row" style="border-top:1px solid var(--border);margin-top:4px;padding-top:8px;"><span class="qs-name">Total</span>' +
-      '<span class="qs-num">Cotas <b>' + r.totHave + '</b></span><span class="qs-num">Dias <b>' + r.totNeed + '</b></span>' +
+      '<span class="qs-num">Cotas <b>' + r.totHave + '</b></span><span class="qs-num">' + (r.rows[0].mult > 1 ? 'Vagas' : 'Dias') + ' <b>' + r.totNeed + '</b></span>' +
       badge_(totDiff) + '<span class="qs-detail">' + r.people + ' pessoa(s) marcada(s)' +
       (r.unavailable ? ' · ' + r.unavailable + ' dia(s) indisponível(is) fora da conta' : '') + '</span></div>';
-    cnt.innerHTML = '<b>Resumo:</b> ' + r.rows.map(x=> x.need + ' ' + x.label.toLowerCase() + (x.need === 1 ? '' : 's')).join(' · ') +
+    cnt.innerHTML = '<b>Resumo:</b> ' + r.rows.map(x=> x.days + ' ' + x.label.toLowerCase() + (x.days === 1 ? '' : 's')).join(' · ') +
       (r.unavailable ? ' · ' + r.unavailable + ' indisponível(is)' : '');
   }
 
@@ -9948,7 +9951,7 @@ async function loadVisaoDiaPanel(){
       const bad = r.rows.filter(x=> x.diff !== 0);
       if(!bad.length) return;
       const msg = 'As cotas não batem com os dias configurados para o mês:\n\n' +
-        bad.map(x=> '• ' + x.label + ': ' + x.have + ' cota(s) para ' + x.need + ' dia(s) — ' + (x.diff < 0 ? 'faltam ' + (-x.diff) : 'sobram ' + x.diff)).join('\n') +
+        bad.map(x=> '• ' + x.label + ': ' + x.have + ' cota(s) para ' + x.need + (x.mult > 1 ? ' vaga(s) (' + x.days + ' dia(s) × ' + x.mult + ')' : ' dia(s)') + ' — ' + (x.diff < 0 ? 'faltam ' + (-x.diff) : 'sobram ' + x.diff)).join('\n') +
         '\n\nSalvar mesmo assim?';
       if(!confirm(msg)) e.stopImmediatePropagation();
     }, true);
