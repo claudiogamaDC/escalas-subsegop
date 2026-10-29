@@ -9646,6 +9646,40 @@ async function renderOriginais_(setor){
           <tbody>${summaryRows || '<tr><td colspan="4" class="orig-empty">Sem dados.</td></tr>'}</tbody>
         </table>
       </div>`;
+
+    // Extração da escala original (congelada) = escala de referência do mês.
+    const dlBtn = document.createElement('button');
+    dlBtn.className = 'save-btn';
+    dlBtn.style.cssText = 'margin-top:10px;width:auto;padding:8px 16px;';
+    dlBtn.textContent = '📥 Baixar escala original (Excel)';
+    dlBtn.onclick = async ()=>{
+      const groupLabel = (ORIG_GROUPS_BY_SETOR_[setor].find(g=> g.id === group) || {}).label || group;
+      const dtypes = (orig.data && orig.data.daytypes) || {};
+      const nSlots = Math.max(1, ...Object.keys(origAssign).map(k=> (origAssign[k] || []).length));
+      const head = ['Dia', 'Tipo'];
+      for(let i = 1; i <= nSlots; i++) head.push(nSlots > 1 ? 'Vaga ' + i : 'Escalado');
+      const rows = [[groupLabel + ' — escala original de ' + monthLabel(month)], ['Congelada em ' + origFmtTime_(orig.savedAt) + ' por ' + orig.actor], [], head];
+      for(let day = 1; day <= total; day++){
+        const infos = (origAssign[String(day)] || []).map(origSlotInfo_).filter(x=> x.name);
+        const wd = new Date(yy, mm - 1, day).toLocaleDateString('pt-BR', {weekday:'short'}).replace('.', '');
+        const row = [String(day).padStart(2, '0') + '/' + String(mm).padStart(2, '0') + ' (' + wd + ')', (typeof dtypes[String(day)] === 'string' ? dtypes[String(day)] : '')];
+        for(let i = 0; i < nSlots; i++){
+          const x = infos[i];
+          const sen = x && seniority[nameKey_(x.name)];
+          row.push(x ? (sen ? displayName_(sen.p) : x.name) + (x.ord ? ' (ORD)' : '') : '');
+        }
+        rows.push(row);
+      }
+      rows.push([], ['Dias por pessoa (original)'], ['Pessoa', 'Dias']);
+      people.filter(n=> origCount[n]).forEach(n=>{
+        const sen = seniority[nameKey_(n)];
+        rows.push([sen ? displayName_(sen.p) : n, origCount[n]]);
+      });
+      try{
+        await downloadXLSX_('escala_original_' + group + '_' + month + '.xlsx', 'Escala original', rows);
+      }catch(e){ alert(e && e.message ? e.message : 'Erro ao gerar o Excel.'); }
+    };
+    infoEl.appendChild(dlBtn);
   }catch(e){
     infoEl.innerHTML = '<p style="color:#f87171;font-size:13px;">Erro ao carregar: ' + origEsc_(e && e.message ? e.message : 'tente novamente.') + '</p>';
   }
