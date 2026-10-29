@@ -3502,6 +3502,8 @@ async function setActiveDays(arr){
 // status — antes, CADA clique em Expediente/Serviço/Férias/Folga/Externa
 // disparava 4 chamadas ao backend só pra redesenhar a prévia.
 let expedienteCache_ = null;
+// Reaplica os bloqueios (férias/serviços) nos botões do dia; definido em loadFillPanel.
+let applyExpedienteLocks_ = null;
 // Serviços das escalas mensais aplicados por cima do expediente (como as férias,
 // nunca gravados): SUBSEGOP Serviço Mensal vira "Serviço"; NIIAD, CEMADEN e El
 // Niño viram "Serviço <setor>" (roxo). Vale mais que férias e que a escolha
@@ -3689,6 +3691,7 @@ async function loadFillPanel(){
     });
   };
 
+  applyExpedienteLocks_ = applyFeriasLocks_;
   select.onchange = async ()=>{
     const name = select.value;
     if(!name){ applyFeriasLocks_(null); return; }
@@ -3791,8 +3794,14 @@ async function updatePreview(){
 // Atualizar: busca de novo do servidor e redesenha, mantendo as marcações
 // ainda não salvas de quem está na tela (currentSelection não é mexido).
 document.getElementById('fe-refresh-btn').onclick = async ()=>{
-  await getExpedienteBundle_();
-  await updatePreview();
+  const btn = document.getElementById('fe-refresh-btn');
+  btn.disabled = true;
+  try{
+    await getExpedienteBundle_(); // rebusca também as escalas mensais (SUBSEGOP, NIIAD, CEMADEN, El Niño)
+    const sel = document.getElementById('name-select');
+    if(applyExpedienteLocks_) applyExpedienteLocks_(sel ? sel.value : null);
+    await updatePreview();
+  } finally { btn.disabled = false; }
 };
 
 // PNG: sempre com os dados já salvos (mesma foto da antiga Escala Expediente),
