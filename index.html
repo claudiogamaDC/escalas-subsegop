@@ -2527,7 +2527,9 @@ async function permIsReleasedFresh_(relKey, month){
   const b = await window.storage.getBatch([monthKey_(relKey, month), okKey]);
   const released = parseBatchValue_(b, monthKey_(relKey, month), false) === true;
   // Mês seguinte com permutas liberadas pelo admin: a liberação do preenchimento não trava a troca.
-  const swapsOk = month === nextMonthISO_(currentMonthISO_()) && parseBatchValue_(b, okKey, false) === true;
+  const isNext = month === nextMonthISO_(currentMonthISO_());
+  const swapsOk = isNext && parseBatchValue_(b, okKey, false) === true;
+  if(isNext && !swapsOk) return true; // mês seguinte só com a caixa de liberação do admin
   return released && !swapsOk;
 }
 // Valida a permuta com os dados atuais; devolve {ok, reason, warns}.
@@ -2566,12 +2568,12 @@ function permAnnotate_(cfg, swaps, assignments, dayTypes, month){
   });
 }
 // Monta o cartão de permuta e aplica o bloqueio (permuta + cessão) durante a liberação.
-function permSetup_(cfg, month, roster, assignments, dayTypes, released){
+function permSetup_(cfg, month, roster, assignments, dayTypes, released, swapsOk){
   const p = cfg.p;
   const card = document.getElementById(p + '-perm-card');
   const cessao = document.getElementById(p + '-swap-propose-card');
   const isCurrentMonth = month === currentMonthISO_();
-  const hidden = currentRole === 'admin' || currentRole === 'supervisor' || !swapMonthActive_(month);
+  const hidden = currentRole === 'admin' || currentRole === 'supervisor' || !swapActionsOpen_(month, swapsOk);
   if(cessao && !hidden){ nSetCardLock_(cessao, released === true); cessaoWarnSetup_(p, assignments); }
   if(!card) return;
   if(hidden){ card.style.display = 'none'; return; }
@@ -4719,7 +4721,7 @@ async function loadSSwapsPanel(month){
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   const permCfg = permCfg_('s');
   permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
-  permSetup_(permCfg, month, roster, assignments, dayTypes, released);
+  permSetup_(permCfg, month, roster, assignments, dayTypes, released, swapsOk);
 
   // Fora do mês vigente, a tela vira histórico só-leitura: nenhum controle
   // de ação (propor/aceitar/recusar/aprovar/desfazer) fica disponível.
@@ -5846,7 +5848,7 @@ async function loadCSwapsPanel(month){
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   const permCfg = permCfg_('c');
   permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
-  permSetup_(permCfg, month, roster, assignments, dayTypes, released);
+  permSetup_(permCfg, month, roster, assignments, dayTypes, released, swapsOk);
 
   document.getElementById('c-swap-propose-card').style.display = (isAdmin || isSupervisor || !inWindow) ? 'none' : 'block';
   if(!isAdmin && !isSupervisor && inWindow){
@@ -6972,7 +6974,7 @@ async function loadENSwapsPanel(month){
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   const permCfg = permCfg_('en');
   permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
-  permSetup_(permCfg, month, roster, assignments, dayTypes, released);
+  permSetup_(permCfg, month, roster, assignments, dayTypes, released, swapsOk);
 
   document.getElementById('en-swap-propose-card').style.display = (isAdmin || isSupervisor || !inWindow) ? 'none' : 'block';
   if(!isAdmin && !isSupervisor && inWindow){
@@ -8012,8 +8014,8 @@ async function loadNSwapsPanel(month){
   // Mês seguinte com permutas liberadas pelo admin: a liberação do preenchimento não trava a troca.
   const released = releasedRaw && !canAct;
   const mine = swaps.filter(r=> r.fromName === currentUserName);
-  nPermutaSetup_(month, roster, assignments, dayTypes, released);
-  nTipoSetup_(month, assignments, dayTypes, released);
+  nPermutaSetup_(month, roster, assignments, dayTypes, released, swapsOk);
+  nTipoSetup_(month, assignments, dayTypes, released, swapsOk);
   // Aviso de ORD em dia vermelho / vaga que mudou, só pra exibir ao admin (não é gravado).
   swaps.forEach(r=>{
     if(r.kind === 'permuta' && (r.status === 'aguardando_admin' || r.status === 'aguardando_destino')){
@@ -8234,7 +8236,7 @@ async function nSwapDecide_(id, approve, month){
    o dia do outro continua ORD ou RAS como já era. */
 // Permuta e troca de tipo só abrem depois que o admin encerra o período de
 // escolha (preenchimento liberado = escala ainda sendo montada).
-const N_LOCK_MSG_ = '🔒 Disponível só depois que o admin encerrar o período de escolha de serviços (escala ainda em montagem).';
+const N_LOCK_MSG_ = '🔒 Indisponível agora: o período de escolha de serviços ainda está aberto ou o admin ainda não liberou as trocas deste mês.';
 function nSetCardLock_(card, locked){
   const note = card.querySelector('.n-lock-note');
   Array.from(card.children).forEach(el=>{
@@ -8302,11 +8304,11 @@ function nPermutaWarn_(req, assignments, dayTypes, month){
   return chk.warns.join(' ');
 }
 
-function nPermutaSetup_(month, roster, assignments, dayTypes, released){
+function nPermutaSetup_(month, roster, assignments, dayTypes, released, swapsOk){
   const card = document.getElementById('n-perm-card');
   if(!card) return;
   const isCurrentMonth = month === currentMonthISO_();
-  if(currentRole === 'admin' || currentRole === 'supervisor' || !swapMonthActive_(month)){ card.style.display = 'none'; return; }
+  if(currentRole === 'admin' || currentRole === 'supervisor' || !swapActionsOpen_(month, swapsOk)){ card.style.display = 'none'; return; }
   card.style.display = 'block';
   nSetCardLock_(card, released === true);
   if(released === true) return;
@@ -8472,10 +8474,10 @@ function nTipoInfo_(req, assignments, dayTypes, month){
   return { warn: chk.warns.join(' '), info: 'Efeito nas cotas de ' + req.fromName + ': ' + chk.effect + '.' };
 }
 
-function nTipoSetup_(month, assignments, dayTypes, released){
+function nTipoSetup_(month, assignments, dayTypes, released, swapsOk){
   const card = document.getElementById('n-tipo-card');
   if(!card) return;
-  if(currentRole === 'admin' || currentRole === 'supervisor' || !swapMonthActive_(month)){ card.style.display = 'none'; return; }
+  if(currentRole === 'admin' || currentRole === 'supervisor' || !swapActionsOpen_(month, swapsOk)){ card.style.display = 'none'; return; }
   card.style.display = 'block';
   nSetCardLock_(card, released === true);
   if(released === true) return;
