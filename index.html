@@ -1935,12 +1935,27 @@ window.addEventListener('unhandledrejection', function(ev){
 // não dá pra usar location.origin aqui; precisa ser sempre esta URL completa.
 const BACKEND_URL = "https://script.google.com/macros/s/AKfycbw-CulwX45YcOGxfLxCBJJC6fBQqCkTOprRv5nXFTSlIwoKF-2REQeL_xQw57QEi-46/exec";
 const BACKEND_SECRET = "GAMA";
+// Token de sessão emitido pelo servidor no login (vale 6 h); sem ele o servidor só
+// entrega a lista de nomes da tela de login.
+let sessionToken_ = null;
+function handleSessionExpired_(data){
+  if(data && data.error === 'sessao_expirada' && sessionToken_){
+    sessionToken_ = null;
+    try{ sessionStorage.removeItem('escalas_session'); }catch(e){}
+    alert('Sua sessão expirou. Entre novamente.');
+    location.reload();
+  }
+}
 
 async function backendGet(key){
-  const url = BACKEND_URL + "?action=get&key=" + encodeURIComponent(key) + "&secret=" + encodeURIComponent(BACKEND_SECRET);
-  const res = await fetch(url);
+  const res = await fetch(BACKEND_URL, {
+    method: "POST",
+    headers: { "Content-Type": "text/plain;charset=utf-8" },
+    body: JSON.stringify({ action:"get", key, secret: BACKEND_SECRET, token: sessionToken_ })
+  });
   if(!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
+  handleSessionExpired_(data);
   if(!data.ok) throw new Error(data.error || "erro desconhecido");
   return data.value;
 }
@@ -1953,10 +1968,11 @@ async function backendSet(key, value){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"set", key, value, secret: BACKEND_SECRET, adminPassword: currentAdminPassword || undefined })
+    body: JSON.stringify({ action:"set", key, value, secret: BACKEND_SECRET, token: sessionToken_, adminPassword: currentAdminPassword || undefined })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
+  handleSessionExpired_(data);
   if(!data.ok) throw new Error(data.error || "erro desconhecido");
 }
 // Busca várias chaves numa única ida ao servidor — usado pelas telas de
@@ -1966,10 +1982,11 @@ async function backendGetBatch(keys){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"get_batch", keys, secret: BACKEND_SECRET })
+    body: JSON.stringify({ action:"get_batch", keys, secret: BACKEND_SECRET, token: sessionToken_ })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   const data = await res.json();
+  handleSessionExpired_(data);
   if(!data.ok) throw new Error(data.error || "erro desconhecido");
   return data.values;
 }
@@ -2115,13 +2132,15 @@ async function backendLogin(payload){
     body: JSON.stringify(Object.assign({ action:"login", secret: BACKEND_SECRET }, payload))
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
-  return await res.json();
+  const data = await res.json();
+  if(data && data.ok && data.token) sessionToken_ = data.token;
+  return data;
 }
 async function backendSetPassword(name, newPassword, adminPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"set_password", secret: BACKEND_SECRET, name, newPassword, adminPassword })
+    body: JSON.stringify({ action:"set_password", secret: BACKEND_SECRET, token: sessionToken_, name, newPassword, adminPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2130,7 +2149,7 @@ async function backendSetSupervisorPassword(setor, newPassword, adminPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"set_supervisor_password", secret: BACKEND_SECRET, setor, newPassword, adminPassword })
+    body: JSON.stringify({ action:"set_supervisor_password", secret: BACKEND_SECRET, token: sessionToken_, setor, newPassword, adminPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2139,7 +2158,7 @@ async function backendGetSupervisorPasswordStatus(adminPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"get_supervisor_password_status", secret: BACKEND_SECRET, adminPassword })
+    body: JSON.stringify({ action:"get_supervisor_password_status", secret: BACKEND_SECRET, token: sessionToken_, adminPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2148,7 +2167,7 @@ async function backendSetSectorAdminPassword(setor, newPassword, adminPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"set_sector_admin_password", secret: BACKEND_SECRET, setor, newPassword, adminPassword })
+    body: JSON.stringify({ action:"set_sector_admin_password", secret: BACKEND_SECRET, token: sessionToken_, setor, newPassword, adminPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2157,7 +2176,7 @@ async function backendChangeSectorAdminPassword(setor, oldPassword, newPassword)
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"change_sector_admin_password", secret: BACKEND_SECRET, setor, oldPassword, newPassword })
+    body: JSON.stringify({ action:"change_sector_admin_password", secret: BACKEND_SECRET, token: sessionToken_, setor, oldPassword, newPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2166,7 +2185,7 @@ async function backendSetSectorNotifyEmails(setor, supervisorEmail, extraEmail, 
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"set_sector_notify_emails", secret: BACKEND_SECRET, setor, supervisorEmail, extraEmail, adminPassword, adminEmail })
+    body: JSON.stringify({ action:"set_sector_notify_emails", secret: BACKEND_SECRET, token: sessionToken_, setor, supervisorEmail, extraEmail, adminPassword, adminEmail })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2175,7 +2194,7 @@ async function backendGetSectorNotifyEmails(setor, adminPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"get_sector_notify_emails", secret: BACKEND_SECRET, setor, adminPassword })
+    body: JSON.stringify({ action:"get_sector_notify_emails", secret: BACKEND_SECRET, token: sessionToken_, setor, adminPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2184,7 +2203,7 @@ async function backendSetGestorPassword(newPassword, adminPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"set_gestor_password", secret: BACKEND_SECRET, newPassword, adminPassword })
+    body: JSON.stringify({ action:"set_gestor_password", secret: BACKEND_SECRET, token: sessionToken_, newPassword, adminPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2193,7 +2212,7 @@ async function backendChangeGestorPassword(oldPassword, newPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"change_gestor_password", secret: BACKEND_SECRET, oldPassword, newPassword })
+    body: JSON.stringify({ action:"change_gestor_password", secret: BACKEND_SECRET, token: sessionToken_, oldPassword, newPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2202,7 +2221,7 @@ async function backendGetGestorReportConfig(password){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"get_gestor_report_config", secret: BACKEND_SECRET, password })
+    body: JSON.stringify({ action:"get_gestor_report_config", secret: BACKEND_SECRET, token: sessionToken_, password })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2211,7 +2230,7 @@ async function backendSetGestorReportConfig(emails, hour, password){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"set_gestor_report_config", secret: BACKEND_SECRET, emails, hour, password })
+    body: JSON.stringify({ action:"set_gestor_report_config", secret: BACKEND_SECRET, token: sessionToken_, emails, hour, password })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2220,7 +2239,7 @@ async function backendSendDailyReportNow(date, recipients, password){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"send_daily_report_now", secret: BACKEND_SECRET, date, recipients, password })
+    body: JSON.stringify({ action:"send_daily_report_now", secret: BACKEND_SECRET, token: sessionToken_, date, recipients, password })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2231,7 +2250,7 @@ async function backendNotifySwapApproved(setor, groupLabel, month, day, fromName
     const res = await fetch(BACKEND_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action:"notify_swap_approved", secret: BACKEND_SECRET, setor, groupLabel, month, day, dayB, kind, fromName, toName })
+      body: JSON.stringify({ action:"notify_swap_approved", secret: BACKEND_SECRET, token: sessionToken_, setor, groupLabel, month, day, dayB, kind, fromName, toName })
     });
     return await res.json();
   }catch(e){
@@ -2248,7 +2267,7 @@ async function backendNotifySwapPendingAdmin(setor, groupLabel, month, day, from
     const res = await fetch(BACKEND_URL, {
       method: "POST",
       headers: { "Content-Type": "text/plain;charset=utf-8" },
-      body: JSON.stringify({ action:"notify_swap_pending_admin", secret: BACKEND_SECRET, setor, groupLabel, month, day, dayB, kind, fromName, toName })
+      body: JSON.stringify({ action:"notify_swap_pending_admin", secret: BACKEND_SECRET, token: sessionToken_, setor, groupLabel, month, day, dayB, kind, fromName, toName })
     });
     return await res.json();
   }catch(e){
@@ -2260,7 +2279,7 @@ async function backendChangePassword(name, oldPassword, newPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"change_password", secret: BACKEND_SECRET, name, oldPassword, newPassword })
+    body: JSON.stringify({ action:"change_password", secret: BACKEND_SECRET, token: sessionToken_, name, oldPassword, newPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2269,7 +2288,7 @@ async function backendGetIcsToken(name){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"get_ics_token", secret: BACKEND_SECRET, name })
+    body: JSON.stringify({ action:"get_ics_token", secret: BACKEND_SECRET, token: sessionToken_, name })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2278,7 +2297,7 @@ async function backendRevokeIcsToken(name){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"revoke_ics_token", secret: BACKEND_SECRET, name })
+    body: JSON.stringify({ action:"revoke_ics_token", secret: BACKEND_SECRET, token: sessionToken_, name })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2292,7 +2311,7 @@ function logEvent(type, actor, details){
   fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"log_event", secret: BACKEND_SECRET, type, actor: actor || '—', details: details || '' })
+    body: JSON.stringify({ action:"log_event", secret: BACKEND_SECRET, token: sessionToken_, type, actor: actor || '—', details: details || '' })
   }).catch(()=>{});
 }
 // Identifica no histórico se quem agiu foi o Admin Master (acesso total) ou
@@ -2837,7 +2856,7 @@ async function backendGetLogs(adminPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"get_logs", secret: BACKEND_SECRET, adminPassword })
+    body: JSON.stringify({ action:"get_logs", secret: BACKEND_SECRET, token: sessionToken_, adminPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2846,7 +2865,7 @@ async function backendClearLogs(adminPassword){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify({ action:"clear_logs", secret: BACKEND_SECRET, adminPassword })
+    body: JSON.stringify({ action:"clear_logs", secret: BACKEND_SECRET, token: sessionToken_, adminPassword })
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
@@ -2869,7 +2888,8 @@ function saveSession(){
     // não ficarem ao alcance de um script injetado na página.
     sessionStorage.setItem('escalas_session', JSON.stringify({
       role: currentRole, groups: currentGroups, levels: currentLevels, name: currentUserName,
-      adminSetor: currentAdminSetor
+      adminSetor: currentAdminSetor,
+      token: (currentRole === 'user' || currentRole === 'supervisor') ? sessionToken_ : null
     }));
   }catch(e){}
 }
@@ -3039,7 +3059,7 @@ document.getElementById('login-name-select').addEventListener('focus', ()=>{
 
 function logout(){
   clearSession();
-  currentRole = null; currentGroups = []; currentLevels = {}; currentUserName = null; currentAdminPassword = null; currentAdminSetor = null; currentGestorPassword = null;
+  currentRole = null; currentGroups = []; currentLevels = {}; currentUserName = null; currentAdminPassword = null; currentAdminSetor = null; currentGestorPassword = null; sessionToken_ = null;
   document.getElementById('app-content').style.display = 'none';
   document.getElementById('lock-screen').style.display = 'flex';
   document.getElementById('login-password-input').value = '';
@@ -3283,7 +3303,7 @@ async function doUserLogin(){
     } else if(res.error === 'sem_senha'){
       err.textContent = 'Você ainda não tem senha cadastrada. Peça ao administrador para configurar uma.';
     } else {
-      err.textContent = 'Senha incorreta.';
+      err.textContent = res.error === 'muitas_tentativas' ? 'Muitas tentativas erradas. Aguarde 15 minutos e tente de novo.' : 'Senha incorreta.';
     }
   }catch(e){
     console.error('Erro no login de usuário:', e);
@@ -3315,7 +3335,7 @@ async function doAdminLogin(){
       });
       logEvent('login', 'Admin', setor ? ('Entrou como administrador do setor ' + setor) : 'Entrou como administrador Master');
     } else {
-      err.textContent = 'Senha incorreta.';
+      err.textContent = res.error === 'muitas_tentativas' ? 'Muitas tentativas erradas. Aguarde 15 minutos e tente de novo.' : 'Senha incorreta.';
     }
   }catch(e){
     console.error('Erro no login de admin:', e);
@@ -3344,7 +3364,7 @@ async function doSupervisorLogin(){
     } else if(res.error === 'sem_senha'){
       err.textContent = 'Ainda não há senha de supervisão cadastrada pra esse setor. Peça ao administrador.';
     } else {
-      err.textContent = 'Senha incorreta.';
+      err.textContent = res.error === 'muitas_tentativas' ? 'Muitas tentativas erradas. Aguarde 15 minutos e tente de novo.' : 'Senha incorreta.';
     }
   }catch(e){
     console.error('Erro no login de supervisão:', e);
@@ -3370,7 +3390,7 @@ async function doGestorLogin(){
       enterApp({ role:'gestor', groups:[], levels:{}, name:null, adminPassword:null, gestorPassword: password });
       logEvent('login', 'Gestor', 'Entrou como gestor');
     } else {
-      err.textContent = 'Senha incorreta.';
+      err.textContent = res.error === 'muitas_tentativas' ? 'Muitas tentativas erradas. Aguarde 15 minutos e tente de novo.' : 'Senha incorreta.';
     }
   }catch(e){
     console.error('Erro no login de gestor:', e);
@@ -3416,7 +3436,8 @@ setTimeout(function resumeSession(){
   // Admin e gestor precisam entrar de novo após recarregar a página (a senha
   // não é mais guardada no navegador).
   if(saved && (saved.role === 'admin' || saved.role === 'gestor')){ clearSession(); populateLoginNameSelect(); }
-  else if(saved && saved.role){
+  else if(saved && saved.role && saved.token){
+    sessionToken_ = saved.token;
     currentRole = saved.role;
     currentGroups = saved.groups || [];
     currentLevels = saved.levels || {};
@@ -8270,9 +8291,10 @@ function nSetCardLock_(card, locked){
   note.style.display = locked ? 'block' : 'none';
   note.textContent = locked ? N_LOCK_MSG_ : '';
 }
+// Mesma regra das demais telas de troca: preenchimento aberto trava no mês vigente;
+// no mês seguinte vale só a caixa de liberação do admin.
 async function nIsReleasedFresh_(month){
-  const b = await window.storage.getBatch([monthKey_(K_N_RELEASED, month)]);
-  return parseBatchValue_(b, monthKey_(K_N_RELEASED, month), false) === true;
+  return permIsReleasedFresh_(K_N_RELEASED, month);
 }
 
 function nTypeTag_(isOrd){ return isOrd ? 'ORD' : 'RAS'; }
@@ -9519,7 +9541,7 @@ async function backendOriginals_(payload){
   const res = await fetch(BACKEND_URL, {
     method: "POST",
     headers: { "Content-Type": "text/plain;charset=utf-8" },
-    body: JSON.stringify(Object.assign({ secret: BACKEND_SECRET }, payload))
+    body: JSON.stringify(Object.assign({ secret: BACKEND_SECRET, token: sessionToken_ }, payload))
   });
   if(!res.ok) throw new Error("HTTP " + res.status);
   return res.json();
