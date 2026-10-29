@@ -1976,10 +1976,29 @@ async function backendGetBatch(keys){
 
 // Shim: mantém a mesma API que o resto do código já usa (window.storage.get/set),
 // só que agora conversando com o backend do Google Apps Script.
+// Chaves que o efetivo grava sem senha (escolhas, férias, escalas e trocas):
+// o conteúdo pode vir de qualquer um, então tiramos < > " ` de todos os textos
+// e nomes de campo antes de a tela usá-lo — nenhum nome ou data legítimo tem
+// esses caracteres, e isso impede injeção de HTML/script nas telas.
+const UNTRUSTED_KEY_RE_ = /^(choices|ferias_periodos|[a-z_]+_(assign|swaps))(_\d{4}-\d{2})?$/;
+function stripUntrusted_(v){
+  if(typeof v === 'string') return v.replace(/[<>"`]/g, '');
+  if(Array.isArray(v)) return v.map(stripUntrusted_);
+  if(v && typeof v === 'object'){
+    const out = {};
+    Object.keys(v).forEach(k=>{ out[stripUntrusted_(k)] = stripUntrusted_(v[k]); });
+    return out;
+  }
+  return v;
+}
+function cleanStoredValue_(key, raw){
+  if(typeof raw !== 'string' || !UNTRUSTED_KEY_RE_.test(key)) return raw;
+  try{ return JSON.stringify(stripUntrusted_(JSON.parse(raw))); }catch(e){ return raw; }
+}
 window.storage = {
   async get(key, _isPublic){
     const value = await backendGet(key);
-    return (value === null || value === undefined) ? null : { value };
+    return (value === null || value === undefined) ? null : { value: cleanStoredValue_(key, value) };
   },
   async set(key, value, _isPublic){
     await backendSet(key, value);
@@ -1991,7 +2010,7 @@ window.storage = {
     const out = {};
     keys.forEach(k=>{
       const v = raw[k];
-      out[k] = (v === null || v === undefined) ? null : { value: v };
+      out[k] = (v === null || v === undefined) ? null : { value: cleanStoredValue_(k, v) };
     });
     return out;
   }
@@ -2383,11 +2402,11 @@ function swapRowHtml_(req, buttonsHtml){
   return `<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 0;border-bottom:1px solid #e2e8f0;flex-wrap:wrap;">
     <div style="font-size:13px;color:#1e293b;">
       ${req.kind === 'permuta'
-        ? `🔁 Permuta — Dia <strong>${req.day}</strong> (<strong>${req.fromName}</strong>${req.fromOrd == null ? '' : ', ' + (req.fromOrd ? 'ORD' : 'RAS')}) ⇄ Dia <strong>${req.dayB}</strong> (<strong>${req.toName}</strong>${req.toOrd == null ? '' : ', ' + (req.toOrd ? 'ORD' : 'RAS')})`
+        ? `🔁 Permuta — Dia <strong>${origEsc_(req.day)}</strong> (<strong>${origEsc_(req.fromName)}</strong>${req.fromOrd == null ? '' : ', ' + (req.fromOrd ? 'ORD' : 'RAS')}) ⇄ Dia <strong>${origEsc_(req.dayB)}</strong> (<strong>${origEsc_(req.toName)}</strong>${req.toOrd == null ? '' : ', ' + (req.toOrd ? 'ORD' : 'RAS')})`
         : req.kind === 'troca_tipo'
-        ? `🔀 Troca de tipo — <strong>${req.fromName}</strong>: Dia <strong>${req.day}</strong> (ORD → RAS) · Dia <strong>${req.dayB}</strong> (RAS → ORD)`
-        : `Dia <strong>${req.day}</strong>: <strong>${req.fromName}</strong> → <strong>${req.toName}</strong>`}
-      <div style="font-size:11px;color:#64748b;">${SWAP_STATUS_LABELS_[req.status] || req.status}</div>
+        ? `🔀 Troca de tipo — <strong>${origEsc_(req.fromName)}</strong>: Dia <strong>${origEsc_(req.day)}</strong> (ORD → RAS) · Dia <strong>${origEsc_(req.dayB)}</strong> (RAS → ORD)`
+        : `Dia <strong>${origEsc_(req.day)}</strong>: <strong>${origEsc_(req.fromName)}</strong> → <strong>${origEsc_(req.toName)}</strong>`}
+      <div style="font-size:11px;color:#64748b;">${origEsc_(SWAP_STATUS_LABELS_[req.status] || req.status)}</div>
       ${req._info ? `<div style="font-size:11px;color:#475569;">${req._info}</div>` : ''}
       ${req._warn ? `<div style="font-size:11px;color:#b45309;">⚠️ ${req._warn}</div>` : ''}
     </div>
@@ -2846,9 +2865,11 @@ let currentGestorPassword = null; // guardada só em memória/sessão, só quand
 
 function saveSession(){
   try{
+    // Senhas (admin/gestor) ficam só em memória — nunca no sessionStorage, pra
+    // não ficarem ao alcance de um script injetado na página.
     sessionStorage.setItem('escalas_session', JSON.stringify({
       role: currentRole, groups: currentGroups, levels: currentLevels, name: currentUserName,
-      adminPassword: currentAdminPassword, adminSetor: currentAdminSetor, gestorPassword: currentGestorPassword
+      adminSetor: currentAdminSetor
     }));
   }catch(e){}
 }
@@ -3392,7 +3413,10 @@ document.querySelectorAll('.tab').forEach(tab=>{
 // antes da sessão ser retomada.
 setTimeout(function resumeSession(){
   const saved = loadSession();
-  if(saved && saved.role){
+  // Admin e gestor precisam entrar de novo após recarregar a página (a senha
+  // não é mais guardada no navegador).
+  if(saved && (saved.role === 'admin' || saved.role === 'gestor')){ clearSession(); populateLoginNameSelect(); }
+  else if(saved && saved.role){
     currentRole = saved.role;
     currentGroups = saved.groups || [];
     currentLevels = saved.levels || {};
@@ -9425,9 +9449,9 @@ async function loadLogPanel(){
     listEl.innerHTML = logs.map(l => `
       <div class="log-row">
         <span class="log-time">${fmtLogTimestamp_(l.timestamp)}</span>
-        <span class="log-type ${l.type}">${LOG_TYPE_LABELS[l.type] || l.type}</span>
-        <span class="log-actor">${l.actor}</span>
-        <span class="log-details">${l.details}</span>
+        <span class="log-type ${origEsc_(l.type)}">${origEsc_(LOG_TYPE_LABELS[l.type] || l.type)}</span>
+        <span class="log-actor">${origEsc_(l.actor)}</span>
+        <span class="log-details">${origEsc_(l.details)}</span>
       </div>`).join('');
   }catch(e){
     listEl.innerHTML = '<p style="color:#f87171;font-size:13px;">Erro ao carregar histórico: ' + (e && e.message ? e.message : 'tente novamente.') + '</p>';
