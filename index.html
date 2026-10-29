@@ -791,7 +791,7 @@
   <div class="roster-card">
     <label style="margin-top:0;">Mês</label>
     <select id="s-swap-month-select"></select>
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Fora do mês vigente, a tela vira histórico — só consulta, sem ações.</p>
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, com a escala fechada pelo admin, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
   <div class="roster-card" id="s-perm-card">
     <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
@@ -1045,7 +1045,7 @@
   <div class="roster-card">
     <label style="margin-top:0;">Mês</label>
     <select id="c-swap-month-select"></select>
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Fora do mês vigente, a tela vira histórico — só consulta, sem ações.</p>
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, com a escala fechada pelo admin, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
   <div class="roster-card" id="c-perm-card">
     <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
@@ -1342,7 +1342,7 @@
   <div class="roster-card">
     <label style="margin-top:0;">Mês</label>
     <select id="en-swap-month-select"></select>
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Fora do mês vigente, a tela vira histórico — só consulta, sem ações.</p>
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, com a escala fechada pelo admin, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
   <div class="roster-card" id="en-perm-card">
     <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
@@ -1595,7 +1595,7 @@
   <div class="roster-card">
     <label style="margin-top:0;">Mês</label>
     <select id="n-swap-month-select"></select>
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Fora do mês vigente, a tela vira histórico — só consulta, sem ações.</p>
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, com a escala fechada pelo admin, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
   <div class="roster-card" id="n-perm-card">
     <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
@@ -2016,6 +2016,10 @@ function nextMonthISO_(monthISO){
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
 }
 function monthKey_(base, month){ return base + "_" + month; }
+// Permutas/cessões: valem no mês vigente e no seguinte; o seguinte só com a
+// escala fechada para preenchimento pelo admin (não liberada).
+function swapMonthActive_(month){ const cur = currentMonthISO_(); return month === cur || month === nextMonthISO_(cur); }
+function swapActionsOpen_(month, released){ const cur = currentMonthISO_(); return month === cur || (month === nextMonthISO_(cur) && released !== true); }
 
 // Garante que `month` conste na lista (catálogo) de meses já configurados
 // do setor, guardada em `monthListKey` (ex.: K_S_MONTHLIST) — chamado no
@@ -2508,7 +2512,7 @@ function permSetup_(cfg, month, roster, assignments, dayTypes, released){
   const card = document.getElementById(p + '-perm-card');
   const cessao = document.getElementById(p + '-swap-propose-card');
   const isCurrentMonth = month === currentMonthISO_();
-  const hidden = currentRole === 'admin' || currentRole === 'supervisor' || !isCurrentMonth;
+  const hidden = currentRole === 'admin' || currentRole === 'supervisor' || !swapMonthActive_(month);
   if(cessao && !hidden){ nSetCardLock_(cessao, released === true); cessaoWarnSetup_(p, assignments); }
   if(!card) return;
   if(hidden){ card.style.display = 'none'; return; }
@@ -4647,6 +4651,8 @@ async function loadSSwapsPanel(month){
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('s-swap-month-select', K_S_MONTHLIST, month, (m)=> loadSSwapsPanel(m));
   const { roster, assignments, swaps, dayTypes, released } = await getSBundle_(month);
+  const inWindow = swapMonthActive_(month);
+  const canAct = swapActionsOpen_(month, released);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   const permCfg = permCfg_('s');
   permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
@@ -4654,8 +4660,8 @@ async function loadSSwapsPanel(month){
 
   // Fora do mês vigente, a tela vira histórico só-leitura: nenhum controle
   // de ação (propor/aceitar/recusar/aprovar/desfazer) fica disponível.
-  document.getElementById('s-swap-propose-card').style.display = (isAdmin || isSupervisor || !isCurrentMonth) ? 'none' : 'block';
-  if(!isAdmin && !isSupervisor && isCurrentMonth){
+  document.getElementById('s-swap-propose-card').style.display = (isAdmin || isSupervisor || !inWindow) ? 'none' : 'block';
+  if(!isAdmin && !isSupervisor && inWindow){
     const myDays = Object.keys(assignments).filter(d=> (assignments[d]||[]).includes(currentUserName)).sort((a,b)=>Number(a)-Number(b));
     const daySelect = document.getElementById('s-swap-day-select');
     daySelect.innerHTML = myDays.length
@@ -4697,13 +4703,13 @@ async function loadSSwapsPanel(month){
   const incomingEl = document.getElementById('s-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
   incomingEl.innerHTML = swapListHtml_(incoming, 'Nenhum pedido pendente pra você.', req =>
-    isCurrentMonth ? `<button ${SWAP_BTN_ACCEPT_} data-accept="${req.id}">Aceitar</button><button ${SWAP_BTN_REJECT_} data-reject="${req.id}">Recusar</button>` : '');
-  incomingEl.querySelectorAll('[data-accept]').forEach(btn=> btn.onclick = ()=> sSwapRespond_(btn.dataset.accept, true));
-  incomingEl.querySelectorAll('[data-reject]').forEach(btn=> btn.onclick = ()=> sSwapRespond_(btn.dataset.reject, false));
+    canAct ? `<button ${SWAP_BTN_ACCEPT_} data-accept="${req.id}">Aceitar</button><button ${SWAP_BTN_REJECT_} data-reject="${req.id}">Recusar</button>` : '');
+  incomingEl.querySelectorAll('[data-accept]').forEach(btn=> btn.onclick = ()=> sSwapRespond_(btn.dataset.accept, true, month));
+  incomingEl.querySelectorAll('[data-reject]').forEach(btn=> btn.onclick = ()=> sSwapRespond_(btn.dataset.reject, false, month));
 
   const mineEl = document.getElementById('s-swap-mine-list');
-  mineEl.innerHTML = swapListHtml_(mine, 'Você ainda não propôs nenhuma troca.', req => swapMineButtons_(req, isCurrentMonth));
-  mineEl.querySelectorAll('[data-cancel]').forEach(btn=> btn.onclick = ()=> sSwapCancel_(btn.dataset.cancel));
+  mineEl.innerHTML = swapListHtml_(mine, 'Você ainda não propôs nenhuma troca.', req => swapMineButtons_(req, canAct));
+  mineEl.querySelectorAll('[data-cancel]').forEach(btn=> btn.onclick = ()=> sSwapCancel_(btn.dataset.cancel, month));
   mineEl.querySelectorAll('[data-copy]').forEach(btn=> btn.onclick = ()=>{
     const req = mine.find(r=> r.id === btn.dataset.copy);
     if(req) copyTextToClipboard_(swapCopyLine_('SUBSEGOP Serviço Mensal', month, req), btn);
@@ -4727,10 +4733,10 @@ async function loadSSwapsPanel(month){
     adminWrap.style.display = 'block';
     const pending = swaps.filter(r=> r.status === 'aguardando_admin');
     document.getElementById('s-swap-admin-list').innerHTML = swapListHtml_(pending, 'Nada aguardando aprovação.', req =>
-      (isAdmin && isCurrentMonth) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
+      (isAdmin && inWindow) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
     if(isAdmin){
-      document.getElementById('s-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> sSwapDecide_(btn.dataset.approve, true));
-      document.getElementById('s-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> sSwapDecide_(btn.dataset.deny, false));
+      document.getElementById('s-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> sSwapDecide_(btn.dataset.approve, true, month));
+      document.getElementById('s-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> sSwapDecide_(btn.dataset.deny, false, month));
     }
 
     const approved = swaps.filter(r=> r.status === 'aprovada');
@@ -4769,8 +4775,8 @@ function swapMineButtons_(req, isCurrentMonth){
 // Ações de troca (responder/cancelar/decidir/desfazer) só existem pro mês
 // vigente — o backend recusa gravação em *_swaps de qualquer outro mês, e a
 // tela já esconde esses botões fora do mês vigente (loadSSwapsPanel).
-async function sSwapRespond_(id, accept){
-  const month = currentMonthISO_();
+async function sSwapRespond_(id, accept, month){
+  month = month || currentMonthISO_();
   const list = await getSSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_destino') { await loadSSwapsPanel(month); return; }
@@ -4782,8 +4788,8 @@ async function sSwapRespond_(id, accept){
   await loadSSwapsPanel(month);
 }
 
-async function sSwapCancel_(id){
-  const month = currentMonthISO_();
+async function sSwapCancel_(id, month){
+  month = month || currentMonthISO_();
   const list = await getSSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || (req.status !== 'aguardando_destino' && req.status !== 'aguardando_admin')) { await loadSSwapsPanel(month); return; }
@@ -4794,8 +4800,8 @@ async function sSwapCancel_(id){
   await loadSSwapsPanel(month);
 }
 
-async function sSwapDecide_(id, approve){
-  const month = currentMonthISO_();
+async function sSwapDecide_(id, approve, month){
+  month = month || currentMonthISO_();
   const list = await getSSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadSSwapsPanel(month); return; }
@@ -5765,13 +5771,15 @@ async function loadCSwapsPanel(month){
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('c-swap-month-select', K_C_MONTHLIST, month, (m)=> loadCSwapsPanel(m));
   const { roster, assignments, swaps, dayTypes, released } = await getCBundle_(month);
+  const inWindow = swapMonthActive_(month);
+  const canAct = swapActionsOpen_(month, released);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   const permCfg = permCfg_('c');
   permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
   permSetup_(permCfg, month, roster, assignments, dayTypes, released);
 
-  document.getElementById('c-swap-propose-card').style.display = (isAdmin || isSupervisor || !isCurrentMonth) ? 'none' : 'block';
-  if(!isAdmin && !isSupervisor && isCurrentMonth){
+  document.getElementById('c-swap-propose-card').style.display = (isAdmin || isSupervisor || !inWindow) ? 'none' : 'block';
+  if(!isAdmin && !isSupervisor && inWindow){
     const myDays = Object.keys(assignments).filter(d=> (assignments[d]||[]).includes(currentUserName)).sort((a,b)=>Number(a)-Number(b));
     const daySelect = document.getElementById('c-swap-day-select');
     daySelect.innerHTML = myDays.length
@@ -5809,13 +5817,13 @@ async function loadCSwapsPanel(month){
   const incomingEl = document.getElementById('c-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
   incomingEl.innerHTML = swapListHtml_(incoming, 'Nenhum pedido pendente pra você.', req =>
-    isCurrentMonth ? `<button ${SWAP_BTN_ACCEPT_} data-accept="${req.id}">Aceitar</button><button ${SWAP_BTN_REJECT_} data-reject="${req.id}">Recusar</button>` : '');
-  incomingEl.querySelectorAll('[data-accept]').forEach(btn=> btn.onclick = ()=> cSwapRespond_(btn.dataset.accept, true));
-  incomingEl.querySelectorAll('[data-reject]').forEach(btn=> btn.onclick = ()=> cSwapRespond_(btn.dataset.reject, false));
+    canAct ? `<button ${SWAP_BTN_ACCEPT_} data-accept="${req.id}">Aceitar</button><button ${SWAP_BTN_REJECT_} data-reject="${req.id}">Recusar</button>` : '');
+  incomingEl.querySelectorAll('[data-accept]').forEach(btn=> btn.onclick = ()=> cSwapRespond_(btn.dataset.accept, true, month));
+  incomingEl.querySelectorAll('[data-reject]').forEach(btn=> btn.onclick = ()=> cSwapRespond_(btn.dataset.reject, false, month));
 
   const mineEl = document.getElementById('c-swap-mine-list');
-  mineEl.innerHTML = swapListHtml_(mine, 'Você ainda não propôs nenhuma troca.', req => swapMineButtons_(req, isCurrentMonth));
-  mineEl.querySelectorAll('[data-cancel]').forEach(btn=> btn.onclick = ()=> cSwapCancel_(btn.dataset.cancel));
+  mineEl.innerHTML = swapListHtml_(mine, 'Você ainda não propôs nenhuma troca.', req => swapMineButtons_(req, canAct));
+  mineEl.querySelectorAll('[data-cancel]').forEach(btn=> btn.onclick = ()=> cSwapCancel_(btn.dataset.cancel, month));
   mineEl.querySelectorAll('[data-copy]').forEach(btn=> btn.onclick = ()=>{
     const req = mine.find(r=> r.id === btn.dataset.copy);
     if(req) copyTextToClipboard_(swapCopyLine_('CEMADEN', month, req), btn);
@@ -5839,10 +5847,10 @@ async function loadCSwapsPanel(month){
     adminWrap.style.display = 'block';
     const pending = swaps.filter(r=> r.status === 'aguardando_admin');
     document.getElementById('c-swap-admin-list').innerHTML = swapListHtml_(pending, 'Nada aguardando aprovação.', req =>
-      (isAdmin && isCurrentMonth) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
+      (isAdmin && inWindow) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
     if(isAdmin){
-      document.getElementById('c-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> cSwapDecide_(btn.dataset.approve, true));
-      document.getElementById('c-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> cSwapDecide_(btn.dataset.deny, false));
+      document.getElementById('c-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> cSwapDecide_(btn.dataset.approve, true, month));
+      document.getElementById('c-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> cSwapDecide_(btn.dataset.deny, false, month));
     }
 
     const approved = swaps.filter(r=> r.status === 'aprovada');
@@ -5867,8 +5875,8 @@ async function loadCSwapsPanel(month){
 }
 
 // Ações de troca só existem pro mês vigente (ver comentário equivalente em sSwapRespond_).
-async function cSwapRespond_(id, accept){
-  const month = currentMonthISO_();
+async function cSwapRespond_(id, accept, month){
+  month = month || currentMonthISO_();
   const list = await getCSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_destino') { await loadCSwapsPanel(month); return; }
@@ -5880,8 +5888,8 @@ async function cSwapRespond_(id, accept){
   await loadCSwapsPanel(month);
 }
 
-async function cSwapCancel_(id){
-  const month = currentMonthISO_();
+async function cSwapCancel_(id, month){
+  month = month || currentMonthISO_();
   const list = await getCSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || (req.status !== 'aguardando_destino' && req.status !== 'aguardando_admin')) { await loadCSwapsPanel(month); return; }
@@ -5892,8 +5900,8 @@ async function cSwapCancel_(id){
   await loadCSwapsPanel(month);
 }
 
-async function cSwapDecide_(id, approve){
-  const month = currentMonthISO_();
+async function cSwapDecide_(id, approve, month){
+  month = month || currentMonthISO_();
   const list = await getCSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadCSwapsPanel(month); return; }
@@ -6882,13 +6890,15 @@ async function loadENSwapsPanel(month){
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('en-swap-month-select', K_EN_MONTHLIST, month, (m)=> loadENSwapsPanel(m));
   const { roster, assignments, swaps, dayTypes, released } = await getENBundle_(month);
+  const inWindow = swapMonthActive_(month);
+  const canAct = swapActionsOpen_(month, released);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   const permCfg = permCfg_('en');
   permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
   permSetup_(permCfg, month, roster, assignments, dayTypes, released);
 
-  document.getElementById('en-swap-propose-card').style.display = (isAdmin || isSupervisor || !isCurrentMonth) ? 'none' : 'block';
-  if(!isAdmin && !isSupervisor && isCurrentMonth){
+  document.getElementById('en-swap-propose-card').style.display = (isAdmin || isSupervisor || !inWindow) ? 'none' : 'block';
+  if(!isAdmin && !isSupervisor && inWindow){
     const myDays = Object.keys(assignments).filter(d=> (assignments[d]||[]).includes(currentUserName)).sort((a,b)=>Number(a)-Number(b));
     const daySelect = document.getElementById('en-swap-day-select');
     daySelect.innerHTML = myDays.length
@@ -6926,13 +6936,13 @@ async function loadENSwapsPanel(month){
   const incomingEl = document.getElementById('en-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
   incomingEl.innerHTML = swapListHtml_(incoming, 'Nenhum pedido pendente pra você.', req =>
-    isCurrentMonth ? `<button ${SWAP_BTN_ACCEPT_} data-accept="${req.id}">Aceitar</button><button ${SWAP_BTN_REJECT_} data-reject="${req.id}">Recusar</button>` : '');
-  incomingEl.querySelectorAll('[data-accept]').forEach(btn=> btn.onclick = ()=> enSwapRespond_(btn.dataset.accept, true));
-  incomingEl.querySelectorAll('[data-reject]').forEach(btn=> btn.onclick = ()=> enSwapRespond_(btn.dataset.reject, false));
+    canAct ? `<button ${SWAP_BTN_ACCEPT_} data-accept="${req.id}">Aceitar</button><button ${SWAP_BTN_REJECT_} data-reject="${req.id}">Recusar</button>` : '');
+  incomingEl.querySelectorAll('[data-accept]').forEach(btn=> btn.onclick = ()=> enSwapRespond_(btn.dataset.accept, true, month));
+  incomingEl.querySelectorAll('[data-reject]').forEach(btn=> btn.onclick = ()=> enSwapRespond_(btn.dataset.reject, false, month));
 
   const mineEl = document.getElementById('en-swap-mine-list');
-  mineEl.innerHTML = swapListHtml_(mine, 'Você ainda não propôs nenhuma troca.', req => swapMineButtons_(req, isCurrentMonth));
-  mineEl.querySelectorAll('[data-cancel]').forEach(btn=> btn.onclick = ()=> enSwapCancel_(btn.dataset.cancel));
+  mineEl.innerHTML = swapListHtml_(mine, 'Você ainda não propôs nenhuma troca.', req => swapMineButtons_(req, canAct));
+  mineEl.querySelectorAll('[data-cancel]').forEach(btn=> btn.onclick = ()=> enSwapCancel_(btn.dataset.cancel, month));
   mineEl.querySelectorAll('[data-copy]').forEach(btn=> btn.onclick = ()=>{
     const req = mine.find(r=> r.id === btn.dataset.copy);
     if(req) copyTextToClipboard_(swapCopyLine_('Adm Comitê El Niño', month, req), btn);
@@ -6956,10 +6966,10 @@ async function loadENSwapsPanel(month){
     adminWrap.style.display = 'block';
     const pending = swaps.filter(r=> r.status === 'aguardando_admin');
     document.getElementById('en-swap-admin-list').innerHTML = swapListHtml_(pending, 'Nada aguardando aprovação.', req =>
-      (isAdmin && isCurrentMonth) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
+      (isAdmin && inWindow) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
     if(isAdmin){
-      document.getElementById('en-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> enSwapDecide_(btn.dataset.approve, true));
-      document.getElementById('en-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> enSwapDecide_(btn.dataset.deny, false));
+      document.getElementById('en-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> enSwapDecide_(btn.dataset.approve, true, month));
+      document.getElementById('en-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> enSwapDecide_(btn.dataset.deny, false, month));
     }
 
     const approved = swaps.filter(r=> r.status === 'aprovada');
@@ -6984,8 +6994,8 @@ async function loadENSwapsPanel(month){
 }
 
 // Ações de troca só existem pro mês vigente (ver comentário equivalente em sSwapRespond_).
-async function enSwapRespond_(id, accept){
-  const month = currentMonthISO_();
+async function enSwapRespond_(id, accept, month){
+  month = month || currentMonthISO_();
   const list = await getENSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_destino') { await loadENSwapsPanel(month); return; }
@@ -6997,8 +7007,8 @@ async function enSwapRespond_(id, accept){
   await loadENSwapsPanel(month);
 }
 
-async function enSwapCancel_(id){
-  const month = currentMonthISO_();
+async function enSwapCancel_(id, month){
+  month = month || currentMonthISO_();
   const list = await getENSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || (req.status !== 'aguardando_destino' && req.status !== 'aguardando_admin')) { await loadENSwapsPanel(month); return; }
@@ -7009,8 +7019,8 @@ async function enSwapCancel_(id){
   await loadENSwapsPanel(month);
 }
 
-async function enSwapDecide_(id, approve){
-  const month = currentMonthISO_();
+async function enSwapDecide_(id, approve, month){
+  month = month || currentMonthISO_();
   const list = await getENSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadENSwapsPanel(month); return; }
@@ -7915,6 +7925,8 @@ async function loadNSwapsPanel(month){
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('n-swap-month-select', K_N_MONTHLIST, month, (m)=> loadNSwapsPanel(m));
   const { roster, assignments, swaps, dayTypes, released } = await getNBundle_(month);
+  const inWindow = swapMonthActive_(month);
+  const canAct = swapActionsOpen_(month, released);
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   nPermutaSetup_(month, roster, assignments, dayTypes, released);
   nTipoSetup_(month, assignments, dayTypes, released);
@@ -7933,9 +7945,9 @@ async function loadNSwapsPanel(month){
     }
   });
 
-  document.getElementById('n-swap-propose-card').style.display = (isAdmin || isSupervisor || !isCurrentMonth) ? 'none' : 'block';
-  if(!isAdmin && !isSupervisor && isCurrentMonth){ nSetCardLock_(document.getElementById('n-swap-propose-card'), released === true); cessaoWarnSetup_('n', assignments); }
-  if(!isAdmin && !isSupervisor && isCurrentMonth){
+  document.getElementById('n-swap-propose-card').style.display = (isAdmin || isSupervisor || !inWindow) ? 'none' : 'block';
+  if(!isAdmin && !isSupervisor && inWindow){ nSetCardLock_(document.getElementById('n-swap-propose-card'), released === true); cessaoWarnSetup_('n', assignments); }
+  if(!isAdmin && !isSupervisor && inWindow){
     const myDays = Object.keys(assignments).filter(d=> nSlotNames_(assignments[d]).includes(currentUserName)).sort((a,b)=>Number(a)-Number(b));
     const daySelect = document.getElementById('n-swap-day-select');
     daySelect.innerHTML = myDays.length
@@ -7973,13 +7985,13 @@ async function loadNSwapsPanel(month){
   const incomingEl = document.getElementById('n-swap-incoming-list');
   const incoming = swaps.filter(r=> r.status === 'aguardando_destino' && r.toName === currentUserName);
   incomingEl.innerHTML = swapListHtml_(incoming, 'Nenhum pedido pendente pra você.', req =>
-    isCurrentMonth ? `<button ${SWAP_BTN_ACCEPT_} data-accept="${req.id}">Aceitar</button><button ${SWAP_BTN_REJECT_} data-reject="${req.id}">Recusar</button>` : '');
-  incomingEl.querySelectorAll('[data-accept]').forEach(btn=> btn.onclick = ()=> nSwapRespond_(btn.dataset.accept, true));
-  incomingEl.querySelectorAll('[data-reject]').forEach(btn=> btn.onclick = ()=> nSwapRespond_(btn.dataset.reject, false));
+    canAct ? `<button ${SWAP_BTN_ACCEPT_} data-accept="${req.id}">Aceitar</button><button ${SWAP_BTN_REJECT_} data-reject="${req.id}">Recusar</button>` : '');
+  incomingEl.querySelectorAll('[data-accept]').forEach(btn=> btn.onclick = ()=> nSwapRespond_(btn.dataset.accept, true, month));
+  incomingEl.querySelectorAll('[data-reject]').forEach(btn=> btn.onclick = ()=> nSwapRespond_(btn.dataset.reject, false, month));
 
   const mineEl = document.getElementById('n-swap-mine-list');
-  mineEl.innerHTML = swapListHtml_(mine, 'Você ainda não propôs nenhuma troca.', req => swapMineButtons_(req, isCurrentMonth));
-  mineEl.querySelectorAll('[data-cancel]').forEach(btn=> btn.onclick = ()=> nSwapCancel_(btn.dataset.cancel));
+  mineEl.innerHTML = swapListHtml_(mine, 'Você ainda não propôs nenhuma troca.', req => swapMineButtons_(req, canAct));
+  mineEl.querySelectorAll('[data-cancel]').forEach(btn=> btn.onclick = ()=> nSwapCancel_(btn.dataset.cancel, month));
   mineEl.querySelectorAll('[data-copy]').forEach(btn=> btn.onclick = ()=>{
     const req = mine.find(r=> r.id === btn.dataset.copy);
     if(req) copyTextToClipboard_(swapCopyLine_('NIIAD', month, req), btn);
@@ -8004,10 +8016,10 @@ async function loadNSwapsPanel(month){
     adminWrap.style.display = 'block';
     const pending = swaps.filter(r=> r.status === 'aguardando_admin');
     document.getElementById('n-swap-admin-list').innerHTML = swapListHtml_(pending, 'Nada aguardando aprovação.', req =>
-      (isAdmin && isCurrentMonth) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
+      (isAdmin && inWindow) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
     if(isAdmin){
-      document.getElementById('n-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> nSwapDecide_(btn.dataset.approve, true));
-      document.getElementById('n-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> nSwapDecide_(btn.dataset.deny, false));
+      document.getElementById('n-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> nSwapDecide_(btn.dataset.approve, true, month));
+      document.getElementById('n-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> nSwapDecide_(btn.dataset.deny, false, month));
     }
 
     const approved = swaps.filter(r=> r.status === 'aprovada');
@@ -8032,8 +8044,8 @@ async function loadNSwapsPanel(month){
 }
 
 // Ações de troca só existem pro mês vigente (ver comentário equivalente em sSwapRespond_).
-async function nSwapCancel_(id){
-  const month = currentMonthISO_();
+async function nSwapCancel_(id, month){
+  month = month || currentMonthISO_();
   const list = await getNSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || (req.status !== 'aguardando_destino' && req.status !== 'aguardando_admin')) { await loadNSwapsPanel(month); return; }
@@ -8044,8 +8056,8 @@ async function nSwapCancel_(id){
   await loadNSwapsPanel(month);
 }
 
-async function nSwapRespond_(id, accept){
-  const month = currentMonthISO_();
+async function nSwapRespond_(id, accept, month){
+  month = month || currentMonthISO_();
   const list = await getNSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_destino') { await loadNSwapsPanel(month); return; }
@@ -8072,8 +8084,8 @@ async function nAskSwapType_(day, toName, dayType){
   return { isOrd: choice === 'a' };
 }
 
-async function nSwapDecide_(id, approve){
-  const month = currentMonthISO_();
+async function nSwapDecide_(id, approve, month){
+  month = month || currentMonthISO_();
   const list = await getNSwaps(month);
   const req = list.find(r=> r.id === id);
   if(!req || req.status !== 'aguardando_admin') { await loadNSwapsPanel(month); return; }
@@ -8210,7 +8222,7 @@ function nPermutaSetup_(month, roster, assignments, dayTypes, released){
   const card = document.getElementById('n-perm-card');
   if(!card) return;
   const isCurrentMonth = month === currentMonthISO_();
-  if(currentRole === 'admin' || currentRole === 'supervisor' || !isCurrentMonth){ card.style.display = 'none'; return; }
+  if(currentRole === 'admin' || currentRole === 'supervisor' || !swapMonthActive_(month)){ card.style.display = 'none'; return; }
   card.style.display = 'block';
   nSetCardLock_(card, released === true);
   if(released === true) return;
@@ -8379,7 +8391,7 @@ function nTipoInfo_(req, assignments, dayTypes, month){
 function nTipoSetup_(month, assignments, dayTypes, released){
   const card = document.getElementById('n-tipo-card');
   if(!card) return;
-  if(currentRole === 'admin' || currentRole === 'supervisor' || month !== currentMonthISO_()){ card.style.display = 'none'; return; }
+  if(currentRole === 'admin' || currentRole === 'supervisor' || !swapMonthActive_(month)){ card.style.display = 'none'; return; }
   card.style.display = 'block';
   nSetCardLock_(card, released === true);
   if(released === true) return;
