@@ -9514,7 +9514,7 @@ async function renderOriginais_(setor){
   try{
     const [orig, batch] = await Promise.all([
       backendOriginals_({ action:'get_original_schedule', group, month }),
-      window.storage.getBatch([monthKey_(group + '_assign', month), monthKey_(group + '_swaps', month)])
+      window.storage.getBatch([monthKey_(group + '_assign', month), monthKey_(group + '_swaps', month), (group === 'subsegop_serv' ? K_ROSTER : group === 'niiad' ? K_N_ROSTER : K_C_ROSTER)])
     ]);
     if(!orig.ok) throw new Error(orig.error || 'erro ao carregar');
     const curAssign = origParse_(batch, monthKey_(group + '_assign', month), {}) || {};
@@ -9612,11 +9612,24 @@ async function renderOriginais_(setor){
     }
 
     // Resumo por pessoa: quantos dias tinha na original × quantos tem agora.
-    const people = Object.keys(Object.assign({}, origCount, curCount)).sort((a,b)=> a.localeCompare(b, 'pt-BR'));
+    // Ordem de antiguidade (a mesma da distribuição de cotas: posto e, dentro dele, a ordem da lista).
+    const rosterKey = group === 'subsegop_serv' ? K_ROSTER : group === 'niiad' ? K_N_ROSTER : K_C_ROSTER;
+    const rosterRaw = origParse_(batch, rosterKey, []);
+    const rosterSorted = sortByRank_((Array.isArray(rosterRaw) ? rosterRaw : []).map(normalizeCPerson_));
+    const seniority = {};
+    rosterSorted.forEach((p, i)=>{ seniority[nameKey_(p.name)] = { i, p }; });
+    const people = Object.keys(Object.assign({}, origCount, curCount)).sort((a,b)=>{
+      const sa = seniority[nameKey_(a)], sb = seniority[nameKey_(b)];
+      if(sa && sb) return sa.i - sb.i;
+      if(sa) return -1;
+      if(sb) return 1;
+      return a.localeCompare(b, 'pt-BR');
+    });
     const summaryRows = people.map(n=>{
       const o = origCount[n] || 0, c = curCount[n] || 0, d = c - o;
       const dTxt = d > 0 ? '+' + d : String(d);
-      return `<tr><td>${origEsc_(n)}</td><td>${o}</td><td>${c}</td><td class="${d > 0 ? 'orig-up' : d < 0 ? 'orig-down' : ''}">${d === 0 ? '—' : dTxt}</td></tr>`;
+      const sen = seniority[nameKey_(n)];
+      return `<tr><td>${origEsc_(sen ? displayName_(sen.p) : n)}</td><td>${o}</td><td>${c}</td><td class="${d > 0 ? 'orig-up' : d < 0 ? 'orig-down' : ''}">${d === 0 ? '—' : dTxt}</td></tr>`;
     }).join('');
 
     resultEl.innerHTML = `
