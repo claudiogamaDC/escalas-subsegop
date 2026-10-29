@@ -791,7 +791,7 @@
   <div class="roster-card">
     <label style="margin-top:0;">Mês</label>
     <select id="s-swap-month-select"></select>
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, com a escala fechada pelo admin, no mês seguinte; fora disso a tela é só consulta.</p>
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
   <div class="roster-card" id="s-perm-card">
     <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
@@ -913,6 +913,7 @@
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <span id="s-next-release-status-text" style="font-size:14px;font-weight:600;">Carregando...</span>
       <button class="save-btn" id="s-next-toggle-release-btn" style="margin-top:0;width:auto;padding:8px 16px;">Alternar</button>
+      <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;cursor:pointer;"><input type="checkbox" id="s-next-swapsok-chk" style="width:auto;margin:0;"> Liberar permutas / trocas / cessões deste mês</label>
     </div>
     <div class="status" id="s-next-release-admin-status"></div>
   </div>
@@ -1045,7 +1046,7 @@
   <div class="roster-card">
     <label style="margin-top:0;">Mês</label>
     <select id="c-swap-month-select"></select>
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, com a escala fechada pelo admin, no mês seguinte; fora disso a tela é só consulta.</p>
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
   <div class="roster-card" id="c-perm-card">
     <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
@@ -1210,6 +1211,7 @@
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <span id="c-next-release-status-text" style="font-size:14px;font-weight:600;">Carregando...</span>
       <button class="save-btn" id="c-next-toggle-release-btn" style="margin-top:0;width:auto;padding:8px 16px;">Alternar</button>
+      <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;cursor:pointer;"><input type="checkbox" id="c-next-swapsok-chk" style="width:auto;margin:0;"> Liberar permutas / trocas / cessões deste mês</label>
     </div>
     <div class="status" id="c-next-release-admin-status"></div>
   </div>
@@ -1342,7 +1344,7 @@
   <div class="roster-card">
     <label style="margin-top:0;">Mês</label>
     <select id="en-swap-month-select"></select>
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, com a escala fechada pelo admin, no mês seguinte; fora disso a tela é só consulta.</p>
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
   <div class="roster-card" id="en-perm-card">
     <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
@@ -1464,6 +1466,7 @@
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <span id="en-next-release-status-text" style="font-size:14px;font-weight:600;">Carregando...</span>
       <button class="save-btn" id="en-next-toggle-release-btn" style="margin-top:0;width:auto;padding:8px 16px;">Alternar</button>
+      <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;cursor:pointer;"><input type="checkbox" id="en-next-swapsok-chk" style="width:auto;margin:0;"> Liberar permutas / trocas / cessões deste mês</label>
     </div>
     <div class="status" id="en-next-release-admin-status"></div>
   </div>
@@ -1595,7 +1598,7 @@
   <div class="roster-card">
     <label style="margin-top:0;">Mês</label>
     <select id="n-swap-month-select"></select>
-    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, com a escala fechada pelo admin, no mês seguinte; fora disso a tela é só consulta.</p>
+    <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
   <div class="roster-card" id="n-perm-card">
     <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
@@ -1772,6 +1775,7 @@
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <span id="n-next-release-status-text" style="font-size:14px;font-weight:600;">Carregando...</span>
       <button class="save-btn" id="n-next-toggle-release-btn" style="margin-top:0;width:auto;padding:8px 16px;">Alternar</button>
+      <label style="display:flex;align-items:center;gap:6px;margin:0;font-size:13px;cursor:pointer;"><input type="checkbox" id="n-next-swapsok-chk" style="width:auto;margin:0;"> Liberar permutas / trocas / cessões deste mês</label>
     </div>
     <div class="status" id="n-next-release-admin-status"></div>
   </div>
@@ -2016,10 +2020,35 @@ function nextMonthISO_(monthISO){
   return d.getFullYear() + "-" + String(d.getMonth()+1).padStart(2,"0");
 }
 function monthKey_(base, month){ return base + "_" + month; }
-// Permutas/cessões: valem no mês vigente e no seguinte; o seguinte só com a
-// escala fechada para preenchimento pelo admin (não liberada).
+// Permutas/cessões/trocas: valem no mês vigente; no seguinte só quando o admin
+// marca a caixa "Liberar permutas" (chave <grupo>_swapsok_<mês>), independente
+// da liberação do preenchimento.
 function swapMonthActive_(month){ const cur = currentMonthISO_(); return month === cur || month === nextMonthISO_(cur); }
-function swapActionsOpen_(month, released){ const cur = currentMonthISO_(); return month === cur || (month === nextMonthISO_(cur) && released !== true); }
+function swapActionsOpen_(month, swapsOk){ const cur = currentMonthISO_(); return month === cur || (month === nextMonthISO_(cur) && swapsOk === true); }
+// Caixa do admin (painéis "Montar mês seguinte"): libera/bloqueia permutas, trocas e cessões do mês seguinte.
+async function loadSwapsOkChk_(chkId, statusId, keyBase, label){
+  const chk = document.getElementById(chkId);
+  if(!chk) return;
+  const month = nextMonthISO_(currentMonthISO_());
+  const key = monthKey_(keyBase, month);
+  try{ const r = await window.storage.get(key, true); chk.checked = !!r && JSON.parse(r.value) === true; }
+  catch(e){ chk.checked = false; }
+  chk.onchange = async ()=>{
+    const want = chk.checked;
+    const statusEl = document.getElementById(statusId);
+    try{
+      await window.storage.set(key, JSON.stringify(want), true);
+      logEvent('admin', 'Admin', (want ? 'Liberou' : 'Bloqueou') + ' permutas/trocas/cessões (' + label + ', mês seguinte ' + month + ')');
+      statusEl.style.color = '#22c55e';
+      statusEl.textContent = want ? 'Permutas, trocas e cessões liberadas.' : 'Permutas, trocas e cessões bloqueadas.';
+    }catch(e){
+      chk.checked = !want;
+      statusEl.style.color = '#f87171';
+      statusEl.textContent = 'Erro ao salvar: ' + (e && e.message ? e.message : 'armazenamento indisponível.');
+    }
+    setTimeout(()=> statusEl.textContent = '', 4000);
+  };
+}
 
 // Garante que `month` conste na lista (catálogo) de meses já configurados
 // do setor, guardada em `monthListKey` (ex.: K_S_MONTHLIST) — chamado no
@@ -2494,8 +2523,12 @@ function permCfg_(p){
 }
 const PERM_TYPE_LABEL_ = { preto:'preto', sexta:'sexta', vermelho:'vermelho' };
 async function permIsReleasedFresh_(relKey, month){
-  const b = await window.storage.getBatch([monthKey_(relKey, month)]);
-  return parseBatchValue_(b, monthKey_(relKey, month), false) === true;
+  const okKey = monthKey_(relKey.replace(/_liberado$/, '_swapsok'), month);
+  const b = await window.storage.getBatch([monthKey_(relKey, month), okKey]);
+  const released = parseBatchValue_(b, monthKey_(relKey, month), false) === true;
+  // Mês seguinte com permutas liberadas pelo admin: a liberação do preenchimento não trava a troca.
+  const swapsOk = month === nextMonthISO_(currentMonthISO_()) && parseBatchValue_(b, okKey, false) === true;
+  return released && !swapsOk;
 }
 // Valida a permuta com os dados atuais; devolve {ok, reason, warns}.
 function permCheck_(cfg, assignments, dayTypes, month, nameA, dayX, nameB, dayY){
@@ -4459,6 +4492,7 @@ document.getElementById('save-active-days-btn').onclick = async ()=>{
 const K_S_MONTHLIST = "subsegop_serv_month_list";
 const K_S_DAYTYPES = "subsegop_serv_daytypes";
 const K_S_ASSIGN = "subsegop_serv_assign";
+const K_S_SWAPSOK = "subsegop_serv_swapsok";
 const K_S_RELEASED = "subsegop_serv_liberado";
 const K_S_SKIPPED = "subsegop_serv_pulados";
 const K_S_OBS = "subsegop_serv_observacoes";
@@ -4575,7 +4609,7 @@ async function getSBundle_(month){
   const batch = await window.storage.getBatch([
     K_ROSTER, monthKey_(K_S_PARTICIPANTS, month), monthKey_(K_S_DAYTYPES, month), monthKey_(K_S_ASSIGN, month),
     monthKey_(K_S_SKIPPED, month), monthKey_(K_S_RELEASED, month),
-    monthKey_(K_S_OBS, month), monthKey_(K_S_SWAPS, month), K_S_MONTHLIST
+    monthKey_(K_S_OBS, month), monthKey_(K_S_SWAPS, month), K_S_MONTHLIST, monthKey_(K_S_SWAPSOK, month)
   ]);
   const baseRoster = parseBatchValue_(batch, K_ROSTER, DEFAULT_ROSTER);
   const participants = parseBatchValue_(batch, monthKey_(K_S_PARTICIPANTS, month), null);
@@ -4594,6 +4628,7 @@ async function getSBundle_(month){
     released: parseBatchValue_(batch, monthKey_(K_S_RELEASED, month), false) === true,
     obs: parseBatchValue_(batch, monthKey_(K_S_OBS, month), ""),
     swaps: canonSwaps_(parseBatchValue_(batch, monthKey_(K_S_SWAPS, month), []), baseRoster),
+    swapsOk: parseBatchValue_(batch, monthKey_(K_S_SWAPSOK, month), false) === true,
     // `month` sempre vem preenchido (é um parâmetro, não mais lido do
     // armazenamento) — `configured` é o sinal real de "esse mês já foi
     // salvo alguma vez" (presente no catálogo month_list), usado pra
@@ -4676,9 +4711,11 @@ async function loadSSwapsPanel(month){
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('s-swap-month-select', K_S_MONTHLIST, month, (m)=> loadSSwapsPanel(m));
-  const { roster, assignments, swaps, dayTypes, released } = await getSBundle_(month);
-  const inWindow = swapMonthActive_(month);
-  const canAct = swapActionsOpen_(month, released);
+  const { roster, assignments, swaps, dayTypes, released: releasedRaw, swapsOk } = await getSBundle_(month);
+  const canAct = swapActionsOpen_(month, swapsOk);
+  const inWindow = canAct;
+  // Mês seguinte com permutas liberadas pelo admin: a liberação do preenchimento não trava a troca.
+  const released = releasedRaw && !canAct;
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   const permCfg = permCfg_('s');
   permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
@@ -4759,7 +4796,7 @@ async function loadSSwapsPanel(month){
     adminWrap.style.display = 'block';
     const pending = swaps.filter(r=> r.status === 'aguardando_admin');
     document.getElementById('s-swap-admin-list').innerHTML = swapListHtml_(pending, 'Nada aguardando aprovação.', req =>
-      (isAdmin && inWindow) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
+      (isAdmin && swapMonthActive_(month)) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
     if(isAdmin){
       document.getElementById('s-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> sSwapDecide_(btn.dataset.approve, true, month));
       document.getElementById('s-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> sSwapDecide_(btn.dataset.deny, false, month));
@@ -5565,6 +5602,7 @@ async function loadSAdminNextPanel(){
   document.getElementById('s-next-month-label').textContent = monthLabel(month);
   const released = await getSReleased(month);
   updateSReleaseAdminUI(released, 's-next-release-status-text', 's-next-toggle-release-btn');
+  loadSwapsOkChk_('s-next-swapsok-chk', 's-next-release-admin-status', K_S_SWAPSOK, 'SUBSEGOP Serviço Mensal');
   await Promise.all([
     renderSDayTypesEditor(month, 's-next-daytypes-list'),
     renderSParticipantsEditor(month, 's-next-participants-list')
@@ -5601,6 +5639,7 @@ const K_C_ROSTER = "cemaden_roster";
 const K_C_MONTHLIST = "cemaden_month_list";
 const K_C_DAYTYPES = "cemaden_daytypes";
 const K_C_ASSIGN = "cemaden_assign";
+const K_C_SWAPSOK = "cemaden_swapsok";
 const K_C_RELEASED = "cemaden_liberado";
 const K_C_SKIPPED = "cemaden_pulados";
 const K_C_OBS = "cemaden_observacoes";
@@ -5716,7 +5755,7 @@ async function getCBundle_(month){
   const batch = await window.storage.getBatch([
     K_C_ROSTER, monthKey_(K_C_PARTICIPANTS, month), monthKey_(K_C_DAYTYPES, month), monthKey_(K_C_ASSIGN, month),
     monthKey_(K_C_SKIPPED, month), monthKey_(K_C_RELEASED, month),
-    monthKey_(K_C_OBS, month), monthKey_(K_C_SWAPS, month), K_C_MONTHLIST
+    monthKey_(K_C_OBS, month), monthKey_(K_C_SWAPS, month), K_C_MONTHLIST, monthKey_(K_C_SWAPSOK, month)
   ]);
   const baseRoster = parseBatchValue_(batch, K_C_ROSTER, []).map(normalizeCPerson_);
   const participants = parseBatchValue_(batch, monthKey_(K_C_PARTICIPANTS, month), null);
@@ -5735,6 +5774,7 @@ async function getCBundle_(month){
     released: parseBatchValue_(batch, monthKey_(K_C_RELEASED, month), false) === true,
     obs: parseBatchValue_(batch, monthKey_(K_C_OBS, month), ""),
     swaps: canonSwaps_(parseBatchValue_(batch, monthKey_(K_C_SWAPS, month), []), baseRoster),
+    swapsOk: parseBatchValue_(batch, monthKey_(K_C_SWAPSOK, month), false) === true,
     configured: Array.isArray(monthList) && monthList.includes(month),
     month
   };
@@ -5798,9 +5838,11 @@ async function loadCSwapsPanel(month){
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('c-swap-month-select', K_C_MONTHLIST, month, (m)=> loadCSwapsPanel(m));
-  const { roster, assignments, swaps, dayTypes, released } = await getCBundle_(month);
-  const inWindow = swapMonthActive_(month);
-  const canAct = swapActionsOpen_(month, released);
+  const { roster, assignments, swaps, dayTypes, released: releasedRaw, swapsOk } = await getCBundle_(month);
+  const canAct = swapActionsOpen_(month, swapsOk);
+  const inWindow = canAct;
+  // Mês seguinte com permutas liberadas pelo admin: a liberação do preenchimento não trava a troca.
+  const released = releasedRaw && !canAct;
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   const permCfg = permCfg_('c');
   permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
@@ -5875,7 +5917,7 @@ async function loadCSwapsPanel(month){
     adminWrap.style.display = 'block';
     const pending = swaps.filter(r=> r.status === 'aguardando_admin');
     document.getElementById('c-swap-admin-list').innerHTML = swapListHtml_(pending, 'Nada aguardando aprovação.', req =>
-      (isAdmin && inWindow) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
+      (isAdmin && swapMonthActive_(month)) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
     if(isAdmin){
       document.getElementById('c-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> cSwapDecide_(btn.dataset.approve, true, month));
       document.getElementById('c-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> cSwapDecide_(btn.dataset.deny, false, month));
@@ -6604,6 +6646,7 @@ async function loadCAdminNextPanel(){
   document.getElementById('c-next-month-label').textContent = monthLabel(month);
   const released = await getCReleased(month);
   updateCReleaseAdminUI(released, 'c-next-release-status-text', 'c-next-toggle-release-btn');
+  loadSwapsOkChk_('c-next-swapsok-chk', 'c-next-release-admin-status', K_C_SWAPSOK, 'CEMADEN');
   await Promise.all([
     renderCDayTypesEditor(month, 'c-next-daytypes-list'),
     renderCParticipantsEditor(month, 'c-next-participants-list')
@@ -6745,6 +6788,7 @@ document.getElementById('c-clear-data-btn').onclick = async ()=>{
 const K_EN_MONTHLIST = "elnino_month_list";
 const K_EN_DAYTYPES = "elnino_daytypes";
 const K_EN_ASSIGN = "elnino_assign";
+const K_EN_SWAPSOK = "elnino_swapsok";
 const K_EN_RELEASED = "elnino_liberado";
 const K_EN_SKIPPED = "elnino_pulados";
 const K_EN_OBS = "elnino_observacoes";
@@ -6841,7 +6885,7 @@ async function getENBundle_(month){
   const batch = await window.storage.getBatch([
     K_C_ROSTER, monthKey_(K_EN_PARTICIPANTS, month), monthKey_(K_EN_DAYTYPES, month), monthKey_(K_EN_ASSIGN, month),
     monthKey_(K_EN_SKIPPED, month), monthKey_(K_EN_RELEASED, month),
-    monthKey_(K_EN_OBS, month), monthKey_(K_EN_SWAPS, month), K_EN_MONTHLIST
+    monthKey_(K_EN_OBS, month), monthKey_(K_EN_SWAPS, month), K_EN_MONTHLIST, monthKey_(K_EN_SWAPSOK, month)
   ]);
   const cRoster = parseBatchValue_(batch, K_C_ROSTER, []).map(normalizeCPerson_);
   const participants = parseBatchValue_(batch, monthKey_(K_EN_PARTICIPANTS, month), null);
@@ -6856,6 +6900,7 @@ async function getENBundle_(month){
     released: parseBatchValue_(batch, monthKey_(K_EN_RELEASED, month), false) === true,
     obs: parseBatchValue_(batch, monthKey_(K_EN_OBS, month), ""),
     swaps: canonSwaps_(parseBatchValue_(batch, monthKey_(K_EN_SWAPS, month), []), cRoster),
+    swapsOk: parseBatchValue_(batch, monthKey_(K_EN_SWAPSOK, month), false) === true,
     configured: Array.isArray(monthList) && monthList.includes(month),
     month
   };
@@ -6919,9 +6964,11 @@ async function loadENSwapsPanel(month){
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('en-swap-month-select', K_EN_MONTHLIST, month, (m)=> loadENSwapsPanel(m));
-  const { roster, assignments, swaps, dayTypes, released } = await getENBundle_(month);
-  const inWindow = swapMonthActive_(month);
-  const canAct = swapActionsOpen_(month, released);
+  const { roster, assignments, swaps, dayTypes, released: releasedRaw, swapsOk } = await getENBundle_(month);
+  const canAct = swapActionsOpen_(month, swapsOk);
+  const inWindow = canAct;
+  // Mês seguinte com permutas liberadas pelo admin: a liberação do preenchimento não trava a troca.
+  const released = releasedRaw && !canAct;
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   const permCfg = permCfg_('en');
   permAnnotate_(permCfg, swaps, assignments, dayTypes, month);
@@ -6996,7 +7043,7 @@ async function loadENSwapsPanel(month){
     adminWrap.style.display = 'block';
     const pending = swaps.filter(r=> r.status === 'aguardando_admin');
     document.getElementById('en-swap-admin-list').innerHTML = swapListHtml_(pending, 'Nada aguardando aprovação.', req =>
-      (isAdmin && inWindow) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
+      (isAdmin && swapMonthActive_(month)) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
     if(isAdmin){
       document.getElementById('en-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> enSwapDecide_(btn.dataset.approve, true, month));
       document.getElementById('en-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> enSwapDecide_(btn.dataset.deny, false, month));
@@ -7719,6 +7766,7 @@ async function loadENAdminNextPanel(){
   document.getElementById('en-next-month-label').textContent = monthLabel(month);
   const released = await getENReleased(month);
   updateENReleaseAdminUI(released, 'en-next-release-status-text', 'en-next-toggle-release-btn');
+  loadSwapsOkChk_('en-next-swapsok-chk', 'en-next-release-admin-status', K_EN_SWAPSOK, 'El Niño');
   await Promise.all([
     renderENDayTypesEditor(month, 'en-next-daytypes-list'),
     renderENParticipantsEditor(month, 'en-next-participants-list')
@@ -7772,6 +7820,7 @@ const K_N_ROSTER = "niiad_roster";
 const K_N_MONTHLIST = "niiad_month_list";
 const K_N_DAYTYPES = "niiad_daytypes";
 const K_N_ASSIGN = "niiad_assign";
+const K_N_SWAPSOK = "niiad_swapsok";
 const K_N_RELEASED = "niiad_liberado";
 const K_N_SKIPPED = "niiad_pulados";
 const K_N_OBS = "niiad_observacoes";
@@ -7857,7 +7906,7 @@ async function getNBundle_(month){
   const batch = await window.storage.getBatch([
     K_N_ROSTER, monthKey_(K_N_PARTICIPANTS, month), monthKey_(K_N_DAYTYPES, month), monthKey_(K_N_ASSIGN, month),
     monthKey_(K_N_SKIPPED, month), monthKey_(K_N_RELEASED, month),
-    monthKey_(K_N_OBS, month), monthKey_(K_N_SWAPS, month), K_N_MONTHLIST
+    monthKey_(K_N_OBS, month), monthKey_(K_N_SWAPS, month), K_N_MONTHLIST, monthKey_(K_N_SWAPSOK, month)
   ]);
   const baseRoster = parseBatchValue_(batch, K_N_ROSTER, []);
   const participants = parseBatchValue_(batch, monthKey_(K_N_PARTICIPANTS, month), null);
@@ -7876,6 +7925,7 @@ async function getNBundle_(month){
     released: parseBatchValue_(batch, monthKey_(K_N_RELEASED, month), false) === true,
     obs: parseBatchValue_(batch, monthKey_(K_N_OBS, month), ""),
     swaps: canonSwaps_(parseBatchValue_(batch, monthKey_(K_N_SWAPS, month), []), baseRoster),
+    swapsOk: parseBatchValue_(batch, monthKey_(K_N_SWAPSOK, month), false) === true,
     configured: Array.isArray(monthList) && monthList.includes(month),
     month
   };
@@ -7956,9 +8006,11 @@ async function loadNSwapsPanel(month){
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
   await populateMonthSelect_('n-swap-month-select', K_N_MONTHLIST, month, (m)=> loadNSwapsPanel(m));
-  const { roster, assignments, swaps, dayTypes, released } = await getNBundle_(month);
-  const inWindow = swapMonthActive_(month);
-  const canAct = swapActionsOpen_(month, released);
+  const { roster, assignments, swaps, dayTypes, released: releasedRaw, swapsOk } = await getNBundle_(month);
+  const canAct = swapActionsOpen_(month, swapsOk);
+  const inWindow = canAct;
+  // Mês seguinte com permutas liberadas pelo admin: a liberação do preenchimento não trava a troca.
+  const released = releasedRaw && !canAct;
   const mine = swaps.filter(r=> r.fromName === currentUserName);
   nPermutaSetup_(month, roster, assignments, dayTypes, released);
   nTipoSetup_(month, assignments, dayTypes, released);
@@ -8048,7 +8100,7 @@ async function loadNSwapsPanel(month){
     adminWrap.style.display = 'block';
     const pending = swaps.filter(r=> r.status === 'aguardando_admin');
     document.getElementById('n-swap-admin-list').innerHTML = swapListHtml_(pending, 'Nada aguardando aprovação.', req =>
-      (isAdmin && inWindow) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
+      (isAdmin && swapMonthActive_(month)) ? `<button ${SWAP_BTN_ACCEPT_} data-approve="${req.id}">Aprovar</button><button ${SWAP_BTN_REJECT_} data-deny="${req.id}">Recusar</button>` : '');
     if(isAdmin){
       document.getElementById('n-swap-admin-list').querySelectorAll('[data-approve]').forEach(btn=> btn.onclick = ()=> nSwapDecide_(btn.dataset.approve, true, month));
       document.getElementById('n-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> nSwapDecide_(btn.dataset.deny, false, month));
@@ -9219,6 +9271,7 @@ async function loadNAdminNextPanel(){
   document.getElementById('n-next-month-label').textContent = monthLabel(month);
   const released = await getNReleased(month);
   updateNReleaseAdminUI(released, 'n-next-release-status-text', 'n-next-toggle-release-btn');
+  loadSwapsOkChk_('n-next-swapsok-chk', 'n-next-release-admin-status', K_N_SWAPSOK, 'NIIAD');
   await Promise.all([
     renderNDayTypesEditor(month, 'n-next-daytypes-list'),
     renderNParticipantsEditor(month, 'n-next-participants-list')
