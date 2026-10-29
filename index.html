@@ -2304,8 +2304,34 @@ function diffDayTypes_(before, after){
    ============================================================ */
 function newSwapId_(){ return 'sw_' + Date.now().toString(36) + Math.random().toString(36).slice(2,8); }
 
-async function getSwapList_(key){
-  try{ const r = await window.storage.get(key, true); return r ? JSON.parse(r.value) : []; }
+// Nomes gravados nas escalas/trocas podem divergir do efetivo só por acento ou
+// maiúscula (ex.: "Cláudio Gama" × "Claudio Gama"); aí a busca do posto e as
+// comparações de nome falhavam. Estas funções trazem os nomes pro mesmo
+// formato do efetivo (sem alterar nada no servidor até a próxima gravação).
+function nameKey_(n){ return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
+function canonNameMap_(roster){
+  const m = {};
+  (roster || []).forEach(p=>{ const n = typeof p === 'string' ? p : (p && p.name); if(n) m[nameKey_(n)] = n; });
+  return m;
+}
+function canonName_(n, map){ return (n && map[nameKey_(n)]) || n; }
+function canonAssign_(assign, roster){
+  const map = canonNameMap_(roster), out = {};
+  Object.keys(assign || {}).forEach(d=>{
+    out[d] = (assign[d] || []).map(raw=> (raw && typeof raw === 'object') ? Object.assign({}, raw, { name: canonName_(raw.name, map) }) : canonName_(raw, map));
+  });
+  return out;
+}
+function canonSwaps_(list, roster){
+  const map = canonNameMap_(roster);
+  return (Array.isArray(list) ? list : []).map(r=> Object.assign({}, r, { fromName: canonName_(r.fromName, map), toName: canonName_(r.toName, map) }));
+}
+async function getSwapList_(key, rosterKey){
+  try{
+    if(!rosterKey){ const r = await window.storage.get(key, true); return r ? JSON.parse(r.value) : []; }
+    const b = await window.storage.getBatch([key, rosterKey]);
+    return canonSwaps_(parseBatchValue_(b, key, []), parseBatchValue_(b, rosterKey, []));
+  }
   catch(e){ return []; }
 }
 async function setSwapList_(key, list){ await window.storage.set(key, JSON.stringify(list), true); }
@@ -3529,8 +3555,6 @@ function servicoKeys_(months){
   months.forEach(mo=> SERVICO_FONTES_.forEach(f=> keys.push(monthKey_(f[1](), mo))));
   return keys;
 }
-// Nome sem acento/maiúscula/espaço extra: "Cláudio Gama" (NIIAD) casa com "Claudio Gama" (efetivo).
-function nameKey_(n){ return String(n || '').normalize('NFD').replace(/[̀-ͯ]/g, '').replace(/\s+/g, ' ').trim().toLowerCase(); }
 function servicosSemana_(batch, dates, roster){
   const out = {};
   const canon = {};
@@ -4512,8 +4536,10 @@ async function setSDayTypes(month, obj){
   await window.storage.set(monthKey_(K_S_DAYTYPES, month), JSON.stringify({types: obj}), true);
 }
 async function getSAssignments(month){
-  try{ const r = await window.storage.get(monthKey_(K_S_ASSIGN, month), true); return r ? JSON.parse(r.value) : {}; }
-  catch(e){ return {}; }
+  try{
+    const b = await window.storage.getBatch([monthKey_(K_S_ASSIGN, month), K_ROSTER]);
+    return canonAssign_(parseBatchValue_(b, monthKey_(K_S_ASSIGN, month), {}), parseBatchValue_(b, K_ROSTER, []));
+  }catch(e){ return {}; }
 }
 async function setSAssignments(month, obj){
   await window.storage.set(monthKey_(K_S_ASSIGN, month), JSON.stringify(obj), true);
@@ -4563,11 +4589,11 @@ async function getSBundle_(month){
     baseRoster,
     participants,
     dayTypes: sFilterDayTypes_(parseBatchValue_(batch, monthKey_(K_S_DAYTYPES, month), null), month),
-    assignments: parseBatchValue_(batch, monthKey_(K_S_ASSIGN, month), {}),
+    assignments: canonAssign_(parseBatchValue_(batch, monthKey_(K_S_ASSIGN, month), {}), baseRoster),
     skipped: parseBatchValue_(batch, monthKey_(K_S_SKIPPED, month), []),
     released: parseBatchValue_(batch, monthKey_(K_S_RELEASED, month), false) === true,
     obs: parseBatchValue_(batch, monthKey_(K_S_OBS, month), ""),
-    swaps: parseBatchValue_(batch, monthKey_(K_S_SWAPS, month), []),
+    swaps: canonSwaps_(parseBatchValue_(batch, monthKey_(K_S_SWAPS, month), []), baseRoster),
     // `month` sempre vem preenchido (é um parâmetro, não mais lido do
     // armazenamento) — `configured` é o sinal real de "esse mês já foi
     // salvo alguma vez" (presente no catálogo month_list), usado pra
@@ -4641,7 +4667,7 @@ function sCountsFor_(name, assignments, dayTypes, month){
 
 /* ---------- SUBSEGOP Serviço Mensal: Trocas de plantão (item 1) ---------- */
 const K_S_SWAPS = "subsegop_serv_swaps";
-async function getSSwaps(month){ return getSwapList_(monthKey_(K_S_SWAPS, month)); }
+async function getSSwaps(month){ return getSwapList_(monthKey_(K_S_SWAPS, month), K_ROSTER); }
 async function setSSwaps(month, list){ return setSwapList_(monthKey_(K_S_SWAPS, month), list); }
 
 async function loadSSwapsPanel(month){
@@ -5068,7 +5094,7 @@ async function renderSCalendarList(preloadedBundle, opts){
       // pra gravar).
       const freshBatch = await window.storage.getBatch([monthKey_(K_S_RELEASED, month), monthKey_(K_S_ASSIGN, month)]);
       const freshReleased = parseBatchValue_(freshBatch, monthKey_(K_S_RELEASED, month), false) === true;
-      const freshAssignments = parseBatchValue_(freshBatch, monthKey_(K_S_ASSIGN, month), {});
+      const freshAssignments = canonAssign_(parseBatchValue_(freshBatch, monthKey_(K_S_ASSIGN, month), {}), roster);
       const check = validateSPick_(name, day, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
       const freshSlots = (freshAssignments[day] || []).slice();
@@ -5098,7 +5124,7 @@ async function renderSCalendarList(preloadedBundle, opts){
       // com o preenchimento bloqueado pelo admin.
       const freshBatch = await window.storage.getBatch([monthKey_(K_S_RELEASED, month), monthKey_(K_S_ASSIGN, month)]);
       const freshReleased = parseBatchValue_(freshBatch, monthKey_(K_S_RELEASED, month), false) === true;
-      const freshAssignments = parseBatchValue_(freshBatch, monthKey_(K_S_ASSIGN, month), {});
+      const freshAssignments = canonAssign_(parseBatchValue_(freshBatch, monthKey_(K_S_ASSIGN, month), {}), roster);
       if(!freshReleased && !isAdmin){
         alert('O sistema está bloqueado para preenchimento pelo responsável. Não é possível remover agora.');
         return;
@@ -5617,8 +5643,10 @@ async function getCDayTypes(month){
 }
 async function setCDayTypes(month, obj){ await window.storage.set(monthKey_(K_C_DAYTYPES, month), JSON.stringify(obj), true); }
 async function getCAssignments(month){
-  try{ const r = await window.storage.get(monthKey_(K_C_ASSIGN, month), true); return r ? JSON.parse(r.value) : {}; }
-  catch(e){ return {}; }
+  try{
+    const b = await window.storage.getBatch([monthKey_(K_C_ASSIGN, month), K_C_ROSTER]);
+    return canonAssign_(parseBatchValue_(b, monthKey_(K_C_ASSIGN, month), {}), parseBatchValue_(b, K_C_ROSTER, []));
+  }catch(e){ return {}; }
 }
 async function setCAssignments(month, obj){
   await window.storage.set(monthKey_(K_C_ASSIGN, month), JSON.stringify(obj), true);
@@ -5702,11 +5730,11 @@ async function getCBundle_(month){
     baseRoster,
     participants,
     dayTypes: parseBatchValue_(batch, monthKey_(K_C_DAYTYPES, month), {}),
-    assignments: parseBatchValue_(batch, monthKey_(K_C_ASSIGN, month), {}),
+    assignments: canonAssign_(parseBatchValue_(batch, monthKey_(K_C_ASSIGN, month), {}), baseRoster),
     skipped: parseBatchValue_(batch, monthKey_(K_C_SKIPPED, month), []),
     released: parseBatchValue_(batch, monthKey_(K_C_RELEASED, month), false) === true,
     obs: parseBatchValue_(batch, monthKey_(K_C_OBS, month), ""),
-    swaps: parseBatchValue_(batch, monthKey_(K_C_SWAPS, month), []),
+    swaps: canonSwaps_(parseBatchValue_(batch, monthKey_(K_C_SWAPS, month), []), baseRoster),
     configured: Array.isArray(monthList) && monthList.includes(month),
     month
   };
@@ -5761,7 +5789,7 @@ function cCountsFor_(name, assignments, dayTypes, month){
 
 /* ---------- CEMADEN: Trocas de plantão (item 1) ---------- */
 const K_C_SWAPS = "cemaden_swaps";
-async function getCSwaps(month){ return getSwapList_(monthKey_(K_C_SWAPS, month)); }
+async function getCSwaps(month){ return getSwapList_(monthKey_(K_C_SWAPS, month), K_C_ROSTER); }
 async function setCSwaps(month, list){ return setSwapList_(monthKey_(K_C_SWAPS, month), list); }
 
 async function loadCSwapsPanel(month){
@@ -6152,7 +6180,7 @@ async function renderCCalendarList(preloadedBundle, opts){
       // tanto pra validar quanto pra gravar.
       const freshBatch = await window.storage.getBatch([monthKey_(K_C_RELEASED, month), monthKey_(K_C_ASSIGN, month)]);
       const freshReleased = parseBatchValue_(freshBatch, monthKey_(K_C_RELEASED, month), false) === true;
-      const freshAssignments = parseBatchValue_(freshBatch, monthKey_(K_C_ASSIGN, month), {});
+      const freshAssignments = canonAssign_(parseBatchValue_(freshBatch, monthKey_(K_C_ASSIGN, month), {}), roster);
       const check = validateCPick_(name, day, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
       const freshSlots = (freshAssignments[day] || []).slice();
@@ -6180,7 +6208,7 @@ async function renderCCalendarList(preloadedBundle, opts){
       // com o preenchimento bloqueado pelo admin.
       const freshBatch = await window.storage.getBatch([monthKey_(K_C_RELEASED, month), monthKey_(K_C_ASSIGN, month)]);
       const freshReleased = parseBatchValue_(freshBatch, monthKey_(K_C_RELEASED, month), false) === true;
-      const freshAssignments = parseBatchValue_(freshBatch, monthKey_(K_C_ASSIGN, month), {});
+      const freshAssignments = canonAssign_(parseBatchValue_(freshBatch, monthKey_(K_C_ASSIGN, month), {}), roster);
       if(!freshReleased && !isAdmin){
         alert('O sistema está bloqueado para preenchimento pelo responsável. Não é possível remover agora.');
         return;
@@ -6781,8 +6809,10 @@ async function getENDayTypes(month){
 }
 async function setENDayTypes(month, obj){ await window.storage.set(monthKey_(K_EN_DAYTYPES, month), JSON.stringify(obj), true); }
 async function getENAssignments(month){
-  try{ const r = await window.storage.get(monthKey_(K_EN_ASSIGN, month), true); return r ? JSON.parse(r.value) : {}; }
-  catch(e){ return {}; }
+  try{
+    const b = await window.storage.getBatch([monthKey_(K_EN_ASSIGN, month), K_C_ROSTER]);
+    return canonAssign_(parseBatchValue_(b, monthKey_(K_EN_ASSIGN, month), {}), parseBatchValue_(b, K_C_ROSTER, []));
+  }catch(e){ return {}; }
 }
 async function setENAssignments(month, obj){
   await window.storage.set(monthKey_(K_EN_ASSIGN, month), JSON.stringify(obj), true);
@@ -6821,11 +6851,11 @@ async function getENBundle_(month){
     baseRoster: cRoster,
     participants,
     dayTypes: parseBatchValue_(batch, monthKey_(K_EN_DAYTYPES, month), {}),
-    assignments: parseBatchValue_(batch, monthKey_(K_EN_ASSIGN, month), {}),
+    assignments: canonAssign_(parseBatchValue_(batch, monthKey_(K_EN_ASSIGN, month), {}), cRoster),
     skipped: parseBatchValue_(batch, monthKey_(K_EN_SKIPPED, month), []),
     released: parseBatchValue_(batch, monthKey_(K_EN_RELEASED, month), false) === true,
     obs: parseBatchValue_(batch, monthKey_(K_EN_OBS, month), ""),
-    swaps: parseBatchValue_(batch, monthKey_(K_EN_SWAPS, month), []),
+    swaps: canonSwaps_(parseBatchValue_(batch, monthKey_(K_EN_SWAPS, month), []), cRoster),
     configured: Array.isArray(monthList) && monthList.includes(month),
     month
   };
@@ -6880,7 +6910,7 @@ function enCountsFor_(name, assignments, dayTypes, month){
 
 /* ---------- Adm Comitê El Niño: Trocas de plantão (item 1) ---------- */
 const K_EN_SWAPS = "elnino_swaps";
-async function getENSwaps(month){ return getSwapList_(monthKey_(K_EN_SWAPS, month)); }
+async function getENSwaps(month){ return getSwapList_(monthKey_(K_EN_SWAPS, month), K_C_ROSTER); }
 async function setENSwaps(month, list){ return setSwapList_(monthKey_(K_EN_SWAPS, month), list); }
 
 async function loadENSwapsPanel(month){
@@ -7271,7 +7301,7 @@ async function renderENCalendarList(preloadedBundle, opts){
       // tanto pra validar quanto pra gravar.
       const freshBatch = await window.storage.getBatch([monthKey_(K_EN_RELEASED, month), monthKey_(K_EN_ASSIGN, month)]);
       const freshReleased = parseBatchValue_(freshBatch, monthKey_(K_EN_RELEASED, month), false) === true;
-      const freshAssignments = parseBatchValue_(freshBatch, monthKey_(K_EN_ASSIGN, month), {});
+      const freshAssignments = canonAssign_(parseBatchValue_(freshBatch, monthKey_(K_EN_ASSIGN, month), {}), roster);
       const check = validateENPick_(name, day, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
       const freshSlots = (freshAssignments[day] || []).slice();
@@ -7299,7 +7329,7 @@ async function renderENCalendarList(preloadedBundle, opts){
       // com o preenchimento bloqueado pelo admin.
       const freshBatch = await window.storage.getBatch([monthKey_(K_EN_RELEASED, month), monthKey_(K_EN_ASSIGN, month)]);
       const freshReleased = parseBatchValue_(freshBatch, monthKey_(K_EN_RELEASED, month), false) === true;
-      const freshAssignments = parseBatchValue_(freshBatch, monthKey_(K_EN_ASSIGN, month), {});
+      const freshAssignments = canonAssign_(parseBatchValue_(freshBatch, monthKey_(K_EN_ASSIGN, month), {}), roster);
       if(!freshReleased && !isAdmin){
         alert('O sistema está bloqueado para preenchimento pelo responsável. Não é possível remover agora.');
         return;
@@ -7756,8 +7786,10 @@ async function getNDayTypes(month){
 }
 async function setNDayTypes(month, obj){ await window.storage.set(monthKey_(K_N_DAYTYPES, month), JSON.stringify(obj), true); }
 async function getNAssignments(month){
-  try{ const r = await window.storage.get(monthKey_(K_N_ASSIGN, month), true); return r ? JSON.parse(r.value) : {}; }
-  catch(e){ return {}; }
+  try{
+    const b = await window.storage.getBatch([monthKey_(K_N_ASSIGN, month), K_N_ROSTER]);
+    return canonAssign_(parseBatchValue_(b, monthKey_(K_N_ASSIGN, month), {}), parseBatchValue_(b, K_N_ROSTER, []));
+  }catch(e){ return {}; }
 }
 async function setNAssignments(month, obj){ await window.storage.set(monthKey_(K_N_ASSIGN, month), JSON.stringify(obj), true); }
 async function getNReleased(month){
@@ -7839,11 +7871,11 @@ async function getNBundle_(month){
     baseRoster,
     participants,
     dayTypes: parseBatchValue_(batch, monthKey_(K_N_DAYTYPES, month), {}),
-    assignments: parseBatchValue_(batch, monthKey_(K_N_ASSIGN, month), {}),
+    assignments: canonAssign_(parseBatchValue_(batch, monthKey_(K_N_ASSIGN, month), {}), baseRoster),
     skipped: parseBatchValue_(batch, monthKey_(K_N_SKIPPED, month), []),
     released: parseBatchValue_(batch, monthKey_(K_N_RELEASED, month), false) === true,
     obs: parseBatchValue_(batch, monthKey_(K_N_OBS, month), ""),
-    swaps: parseBatchValue_(batch, monthKey_(K_N_SWAPS, month), []),
+    swaps: canonSwaps_(parseBatchValue_(batch, monthKey_(K_N_SWAPS, month), []), baseRoster),
     configured: Array.isArray(monthList) && monthList.includes(month),
     month
   };
@@ -7915,7 +7947,7 @@ function nCountsFor_(name, assignments, dayTypes, month){
 
 /* ---------- NIIAD: Trocas de plantão (item 1) ---------- */
 const K_N_SWAPS = "niiad_swaps";
-async function getNSwaps(month){ return getSwapList_(monthKey_(K_N_SWAPS, month)); }
+async function getNSwaps(month){ return getSwapList_(monthKey_(K_N_SWAPS, month), K_N_ROSTER); }
 async function setNSwaps(month, list){ return setSwapList_(monthKey_(K_N_SWAPS, month), list); }
 
 async function loadNSwapsPanel(month){
@@ -8732,7 +8764,7 @@ async function renderNCalendarList(preloadedBundle, opts){
       // tanto pra validar quanto pra gravar.
       const freshBatch = await window.storage.getBatch([monthKey_(K_N_RELEASED, month), monthKey_(K_N_ASSIGN, month)]);
       const freshReleased = parseBatchValue_(freshBatch, monthKey_(K_N_RELEASED, month), false) === true;
-      const freshAssignments = parseBatchValue_(freshBatch, monthKey_(K_N_ASSIGN, month), {});
+      const freshAssignments = canonAssign_(parseBatchValue_(freshBatch, monthKey_(K_N_ASSIGN, month), {}), roster);
       const check = validateNPick_(name, day, isOrd, {roster, dayTypes, month, skipped, released: freshReleased, assignments: freshAssignments});
       if(!check.ok){ alert(check.error); return; }
       const freshSlots = (freshAssignments[day] || []).slice();
@@ -8761,7 +8793,7 @@ async function renderNCalendarList(preloadedBundle, opts){
       // com o preenchimento bloqueado pelo admin.
       const freshBatch = await window.storage.getBatch([monthKey_(K_N_RELEASED, month), monthKey_(K_N_ASSIGN, month)]);
       const freshReleased = parseBatchValue_(freshBatch, monthKey_(K_N_RELEASED, month), false) === true;
-      const freshAssignments = parseBatchValue_(freshBatch, monthKey_(K_N_ASSIGN, month), {});
+      const freshAssignments = canonAssign_(parseBatchValue_(freshBatch, monthKey_(K_N_ASSIGN, month), {}), roster);
       if(!freshReleased && !isAdmin){
         alert('O sistema está bloqueado para preenchimento pelo responsável. Não é possível remover agora.');
         return;
@@ -9517,9 +9549,11 @@ async function renderOriginais_(setor){
       window.storage.getBatch([monthKey_(group + '_assign', month), monthKey_(group + '_swaps', month), (group === 'subsegop_serv' ? K_ROSTER : group === 'niiad' ? K_N_ROSTER : K_C_ROSTER)])
     ]);
     if(!orig.ok) throw new Error(orig.error || 'erro ao carregar');
-    const curAssign = origParse_(batch, monthKey_(group + '_assign', month), {}) || {};
+    const curAssign = canonAssign_(origParse_(batch, monthKey_(group + '_assign', month), {}) || {}, origParse_(batch, (group === 'subsegop_serv' ? K_ROSTER : group === 'niiad' ? K_N_ROSTER : K_C_ROSTER), []));
     const swaps = origParse_(batch, monthKey_(group + '_swaps', month), []);
-    const swapList = Array.isArray(swaps) ? swaps : [];
+    const rosterKey0 = group === 'subsegop_serv' ? K_ROSTER : group === 'niiad' ? K_N_ROSTER : K_C_ROSTER;
+    const rosterArr0 = origParse_(batch, rosterKey0, []);
+    const swapList = canonSwaps_(swaps, rosterArr0);
 
     if(!orig.found){
       const nSw = swapList.filter(s=> s.status === 'aprovada').length;
@@ -9527,7 +9561,7 @@ async function renderOriginais_(setor){
       return;
     }
 
-    const origAssign = (orig.data && orig.data.assign) || {};
+    const origAssign = canonAssign_((orig.data && orig.data.assign) || {}, rosterArr0);
     const origLabel = orig.origin === 'auto' ? 'automática, na 1ª troca' : 'manual';
     infoEl.innerHTML = `<div class="orig-banner">Original congelada em <strong>${origFmtTime_(orig.savedAt)}</strong> por ${origEsc_(orig.actor)} (${origLabel}) — versão ${orig.versions}${orig.versions > 1 ? ' (a mais recente vale; as anteriores ficam guardadas na planilha)' : ''}.</div>`;
 
@@ -9727,7 +9761,7 @@ async function getVisaoDiaBundle_(dateISO){
     return slots.map(s=> (s && typeof s === 'object') ? s.name : s).filter(Boolean);
   }
   function withRank(names, roster){
-    return names.map(n=> displayName_(roster.find(p=> p.name === n) || {name:n}));
+    return names.map(n=> displayName_(roster.find(p=> nameKey_(p.name) === nameKey_(n)) || {name:n}));
   }
 
   const sRoster = parseBatchValue_(batch, K_ROSTER, []);
