@@ -135,6 +135,17 @@
   .count-badge{display:inline-block;background:var(--card2);border:1px solid var(--border);border-radius:20px;padding:4px 12px;font-size:12px;color:var(--muted);margin-bottom:14px;}
 
   .roster-card{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:20px;max-width:760px;margin-bottom:16px;}
+  /* Cartões de troca (permuta / cessão / troca de tipo / admin): cada um com cor e título próprios */
+  .swap-card{border-left:5px solid var(--sw);}
+  .swap-card--perm{--sw:#2563eb;}
+  .swap-card--cessao{--sw:#d97706;}
+  .swap-card--tipo{--sw:#7c3aed;}
+  .swap-card--admin{--sw:#dc2626;}
+  .swap-card > label.swap-card-head{display:flex;align-items:flex-start;gap:12px;margin:0 0 14px;padding:12px 14px;border-radius:10px;background:var(--card2);box-shadow:inset 0 0 0 1px var(--sw);color:var(--text);font-size:inherit;}
+  .swap-card-head .ico{font-size:26px;line-height:1.1;}
+  .swap-card-head .ttl{display:block;font-size:17px;font-weight:700;color:var(--text);}
+  .swap-card-head .sub{display:block;margin-top:3px;font-size:12px;font-weight:400;color:var(--muted);line-height:1.4;}
+  .swap-card .save-btn{background:var(--sw);}
   .roster-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;}
   .roster-row input{flex:1;min-width:140px;}
   .roster-row select{width:140px;flex:none;}
@@ -793,8 +804,8 @@
     <select id="s-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
-  <div class="roster-card" id="s-perm-card">
-    <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
+  <div class="roster-card swap-card swap-card--perm" id="s-perm-card">
+    <label class="swap-card-head"><span class="ico">🔁</span><span><span class="ttl">Permuta — trocar dia por dia</span><span class="sub">Você passa um dia seu para outra pessoa e assume um dia dela. Ela precisa aceitar e o admin aprova.</span></span></label>
     <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="s-perm-day-select"></select>
     <label>Permutar com</label>
@@ -806,8 +817,8 @@
     <button class="save-btn" id="s-perm-propose-btn">Enviar pedido de permuta</button>
     <div class="status" id="s-perm-status"></div>
   </div>
-  <div class="roster-card" id="s-swap-propose-card">
-    <label style="margin-top:0;">Ceder um dia meu (cessão de serviço — sem receber outro dia em troca)</label>
+  <div class="roster-card swap-card swap-card--cessao" id="s-swap-propose-card">
+    <label class="swap-card-head"><span class="ico">🎁</span><span><span class="ttl">Cessão — passar um dia para alguém</span><span class="sub">Você cede um dia seu e não recebe outro em troca. A pessoa precisa aceitar e o admin aprova.</span></span></label>
     <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="s-swap-day-select"></select>
     <label>Passar para</label>
@@ -827,8 +838,8 @@
     <div id="s-swap-mine-list" style="padding:12px;"></div>
   </div>
 
-  <div class="roster-card" id="s-swap-admin-direct-card" style="display:none;">
-    <label style="margin-top:0;">Admin: aplicar troca diretamente (sem aguardar aceite)</label>
+  <div class="roster-card swap-card swap-card--admin" id="s-swap-admin-direct-card" style="display:none;">
+    <label class="swap-card-head"><span class="ico">⚡</span><span><span class="ttl">Troca direta (somente admin)</span><span class="sub">Aplica a troca na hora, sem aguardar o aceite. Fica registrada com o seu nome.</span></span></label>
     <select id="s-swap-admin-day-select"></select>
     <label>Sai (quem está no dia)</label>
     <select id="s-swap-admin-from-select"></select>
@@ -1048,8 +1059,8 @@
     <select id="c-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
-  <div class="roster-card" id="c-perm-card">
-    <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
+  <div class="roster-card swap-card swap-card--perm" id="c-perm-card">
+    <label class="swap-card-head"><span class="ico">🔁</span><span><span class="ttl">Permuta — trocar dia por dia</span><span class="sub">Você passa um dia seu para outra pessoa e assume um dia dela. Ela precisa aceitar e o admin aprova.</span></span></label>
     <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="c-perm-day-select"></select>
     <label>Permutar com</label>
@@ -1061,8 +1072,8 @@
     <button class="save-btn" id="c-perm-propose-btn">Enviar pedido de permuta</button>
     <div class="status" id="c-perm-status"></div>
   </div>
-  <div class="roster-card" id="c-swap-propose-card">
-    <label style="margin-top:0;">Ceder um dia meu (cessão de serviço — sem receber outro dia em troca)</label>
+  <div class="roster-card swap-card swap-card--cessao" id="c-swap-propose-card">
+    <label class="swap-card-head"><span class="ico">🎁</span><span><span class="ttl">Cessão — passar um dia para alguém</span><span class="sub">Você cede um dia seu e não recebe outro em troca. A pessoa precisa aceitar e o admin aprova.</span></span></label>
     <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="c-swap-day-select"></select>
     <label>Passar para</label>
@@ -1082,8 +1093,8 @@
     <div id="c-swap-mine-list" style="padding:12px;"></div>
   </div>
 
-  <div class="roster-card" id="c-swap-admin-direct-card" style="display:none;">
-    <label style="margin-top:0;">Admin: aplicar troca diretamente (sem aguardar aceite)</label>
+  <div class="roster-card swap-card swap-card--admin" id="c-swap-admin-direct-card" style="display:none;">
+    <label class="swap-card-head"><span class="ico">⚡</span><span><span class="ttl">Troca direta (somente admin)</span><span class="sub">Aplica a troca na hora, sem aguardar o aceite. Fica registrada com o seu nome.</span></span></label>
     <select id="c-swap-admin-day-select"></select>
     <label>Sai (quem está no dia)</label>
     <select id="c-swap-admin-from-select"></select>
@@ -1346,8 +1357,8 @@
     <select id="en-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
-  <div class="roster-card" id="en-perm-card">
-    <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
+  <div class="roster-card swap-card swap-card--perm" id="en-perm-card">
+    <label class="swap-card-head"><span class="ico">🔁</span><span><span class="ttl">Permuta — trocar dia por dia</span><span class="sub">Você passa um dia seu para outra pessoa e assume um dia dela. Ela precisa aceitar e o admin aprova.</span></span></label>
     <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="en-perm-day-select"></select>
     <label>Permutar com</label>
@@ -1359,8 +1370,8 @@
     <button class="save-btn" id="en-perm-propose-btn">Enviar pedido de permuta</button>
     <div class="status" id="en-perm-status"></div>
   </div>
-  <div class="roster-card" id="en-swap-propose-card">
-    <label style="margin-top:0;">Ceder um dia meu (cessão de serviço — sem receber outro dia em troca)</label>
+  <div class="roster-card swap-card swap-card--cessao" id="en-swap-propose-card">
+    <label class="swap-card-head"><span class="ico">🎁</span><span><span class="ttl">Cessão — passar um dia para alguém</span><span class="sub">Você cede um dia seu e não recebe outro em troca. A pessoa precisa aceitar e o admin aprova.</span></span></label>
     <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="en-swap-day-select"></select>
     <label>Passar para</label>
@@ -1380,8 +1391,8 @@
     <div id="en-swap-mine-list" style="padding:12px;"></div>
   </div>
 
-  <div class="roster-card" id="en-swap-admin-direct-card" style="display:none;">
-    <label style="margin-top:0;">Admin: aplicar troca diretamente (sem aguardar aceite)</label>
+  <div class="roster-card swap-card swap-card--admin" id="en-swap-admin-direct-card" style="display:none;">
+    <label class="swap-card-head"><span class="ico">⚡</span><span><span class="ttl">Troca direta (somente admin)</span><span class="sub">Aplica a troca na hora, sem aguardar o aceite. Fica registrada com o seu nome.</span></span></label>
     <select id="en-swap-admin-day-select"></select>
     <label>Sai (quem está no dia)</label>
     <select id="en-swap-admin-from-select"></select>
@@ -1600,8 +1611,8 @@
     <select id="n-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
-  <div class="roster-card" id="n-perm-card">
-    <label style="margin-top:0;">Propor permuta (trocar um dia meu por um dia de outra pessoa)</label>
+  <div class="roster-card swap-card swap-card--perm" id="n-perm-card">
+    <label class="swap-card-head"><span class="ico">🔁</span><span><span class="ttl">Permuta — trocar dia por dia</span><span class="sub">Você passa um dia seu para outra pessoa e assume um dia dela. Ela precisa aceitar e o admin aprova.</span></span></label>
     <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="n-perm-day-select"></select>
     <label>Permutar com</label>
@@ -1613,8 +1624,8 @@
     <button class="save-btn" id="n-perm-propose-btn">Enviar pedido de permuta</button>
     <div class="status" id="n-perm-status"></div>
   </div>
-  <div class="roster-card" id="n-swap-propose-card">
-    <label style="margin-top:0;">Ceder um dia meu (cessão de serviço — sem receber outro dia em troca)</label>
+  <div class="roster-card swap-card swap-card--cessao" id="n-swap-propose-card">
+    <label class="swap-card-head"><span class="ico">🎁</span><span><span class="ttl">Cessão — passar um dia para alguém</span><span class="sub">Você cede um dia seu e não recebe outro em troca. O dia vai com o mesmo tipo (ORD/RAS) que você tem nele. A pessoa aceita e o admin aprova.</span></span></label>
     <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <select id="n-swap-day-select"></select>
     <label>Passar para</label>
@@ -1623,8 +1634,8 @@
     <button class="save-btn" id="n-swap-propose-btn">Enviar pedido de cessão</button>
     <div class="status" id="n-swap-propose-status"></div>
   </div>
-  <div class="roster-card" id="n-tipo-card">
-    <label style="margin-top:0;">Trocar o tipo dos meus dias (ORD ⇄ RAS)</label>
+  <div class="roster-card swap-card swap-card--tipo" id="n-tipo-card">
+    <label class="swap-card-head"><span class="ico">🔀</span><span><span class="ttl">Troca de tipo — ORD ⇄ RAS</span><span class="sub">Você continua nos mesmos dias e só inverte o tipo de dois deles. Quem decide é o admin.</span></span></label>
     <div class="n-lock-note" style="display:none;font-size:13px;color:#fbbf24;background:var(--card2);border:1px solid var(--border);border-radius:8px;padding:10px 12px;margin-top:8px;"></div>
     <p style="font-size:11px;color:var(--muted);margin:0 0 8px;">Você continua nos mesmos dias; só inverte a marcação de um dia ORD com a de um dia RAS. Quem decide é o admin.</p>
     <label>Dia que hoje é ORD (passa a RAS)</label>
@@ -1646,8 +1657,8 @@
     <div id="n-swap-mine-list" style="padding:12px;"></div>
   </div>
 
-  <div class="roster-card" id="n-swap-admin-direct-card" style="display:none;">
-    <label style="margin-top:0;">Admin: aplicar troca diretamente (sem aguardar aceite)</label>
+  <div class="roster-card swap-card swap-card--admin" id="n-swap-admin-direct-card" style="display:none;">
+    <label class="swap-card-head"><span class="ico">⚡</span><span><span class="ttl">Troca direta (somente admin)</span><span class="sub">Aplica a troca na hora, sem aguardar o aceite. Fica registrada com o seu nome.</span></span></label>
     <select id="n-swap-admin-day-select"></select>
     <label>Sai (quem está no dia)</label>
     <select id="n-swap-admin-from-select"></select>
