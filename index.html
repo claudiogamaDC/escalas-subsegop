@@ -58,6 +58,7 @@
   .tab{position:relative;}
   .tab-badge{position:absolute;top:-9px;right:-7px;min-width:21px;height:21px;padding:0 6px;border-radius:999px;background:#dc2626;color:#fff;font-size:12px;font-weight:700;line-height:21px;text-align:center;box-shadow:0 0 0 2px var(--card);pointer-events:none;}
   .tab-badge--user{background:#2563eb;}
+  .is-busy{background:#64748b !important;color:#fff !important;border-color:#64748b !important;cursor:wait !important;opacity:1 !important;}
   /* Agrupamento visual de abas correlatas (mesmo assunto/mês) por cor da
      borda esquerda — ex.: "Meus serviços" e "Configurar Serviço Mensal" são
      do mesmo grupo (mês vigente), enquanto "... próximo mês"/"Montar mês
@@ -2082,6 +2083,98 @@ function monthKey_(base, month){ return base + "_" + month; }
 // da liberação do preenchimento.
 function swapMonthActive_(month){ const cur = currentMonthISO_(); return month === cur || month === nextMonthISO_(cur); }
 function swapActionsOpen_(month, swapsOk){ const cur = currentMonthISO_(); return month === cur || (month === nextMonthISO_(cur) && swapsOk === true); }
+// Evita pedido duplicado: o mesmo pedido (mesmo tipo, dias e pessoas) já em andamento.
+const DUP_SWAP_MSG_ = 'Você já enviou esse pedido e ele está em andamento. Acompanhe em "Minhas propostas".';
+function dupOpenSwap_(list, req){
+  const same = (a, b)=> String(a == null ? '' : a) === String(b == null ? '' : b);
+  return (list || []).find(r=> r && (r.status === 'aguardando_destino' || r.status === 'aguardando_admin')
+    && nameKey_(r.fromName) === nameKey_(req.fromName) && nameKey_(r.toName) === nameKey_(req.toName)
+    && same(r.day, req.day) && same(r.dayB, req.dayB) && same(r.kind, req.kind));
+}
+
+// Botões de envio de pedido: ao clicar ficam cinza e travados ("⏳ Enviando…") até a operação
+// terminar, e um segundo clique é ignorado. Instalado uma vez por botão; qualquer `btn.onclick = ...`
+// feito depois (os painéis reatribuem a cada carga) passa pelo mesmo controle.
+function guardSendButton_(btnId, statusId, busyLabel){
+  const btn = document.getElementById(btnId);
+  if(!btn || btn.dataset.guarded) return;
+  btn.dataset.guarded = '1';
+  let handler = btn.onclick;
+  btn.onclick = null;
+  Object.defineProperty(btn, 'onclick', { configurable: true, get(){ return handler; }, set(fn){ handler = fn; } });
+  btn.addEventListener('click', async (ev)=>{
+    if(!handler || btn.dataset.busy === '1') return;
+    btn.dataset.busy = '1';
+    const label = btn.textContent;
+    const statusEl = statusId ? document.getElementById(statusId) : null;
+    const workingMsg = '⏳ Enviando… aguarde, não clique de novo.';
+    btn.classList.add('is-busy'); btn.disabled = true; btn.textContent = busyLabel || '⏳ Enviando…';
+    if(statusEl){ statusEl.style.color = 'var(--muted)'; statusEl.textContent = workingMsg; }
+    try{
+      await handler.call(btn, ev);
+      // Se ninguém trocou a mensagem de "enviando" (nem erro nem confirmação), confirma o envio.
+      if(statusEl && statusEl.textContent === workingMsg){
+        statusEl.style.color = '#22c55e'; statusEl.textContent = '✅ Pedido enviado.';
+        setTimeout(()=>{ if(statusEl.textContent === '✅ Pedido enviado.') statusEl.textContent = ''; }, 5000);
+      }
+    }catch(e){
+      console.error(e);
+      if(statusEl){ statusEl.style.color = '#f87171'; statusEl.textContent = '❌ Não foi possível enviar: ' + (e && e.message ? e.message : 'tente novamente.'); }
+    }finally{
+      btn.dataset.busy = ''; btn.disabled = false; btn.classList.remove('is-busy'); btn.textContent = label;
+    }
+  });
+}
+// Botões das listas (aceitar, recusar, cancelar, aprovar, negar, desfazer): mesma proteção por pedido.
+let lastActionBtn_ = null;
+document.addEventListener('click', (e)=>{
+  const b = e.target && e.target.closest ? e.target.closest('button[data-accept],button[data-reject],button[data-cancel],button[data-approve],button[data-deny],button[data-undo]') : null;
+  lastActionBtn_ = b ? { b, t: Date.now() } : null;
+}, true);
+function onceBy_(fn){
+  const running = new Set();
+  return async function(...args){
+    const key = String(args[0]);
+    if(running.has(key)) return;
+    running.add(key);
+    const hit = (lastActionBtn_ && Date.now() - lastActionBtn_.t < 300) ? lastActionBtn_.b : null;
+    const label = hit ? hit.textContent : null;
+    if(hit){ hit.classList.add('is-busy'); hit.disabled = true; hit.textContent = '⏳'; }
+    try{ return await fn.apply(this, args); }
+    finally{
+      running.delete(key);
+      if(hit && hit.isConnected){ hit.classList.remove('is-busy'); hit.disabled = false; hit.textContent = label; }
+    }
+  };
+}
+// Serializa cada ação por pedido (e mostra "⏳" no botão clicado). As funções são declaradas mais
+// adiante; como declarações são içadas, dá para trocá-las aqui.
+sSwapRespond_ = onceBy_(sSwapRespond_);
+sSwapCancel_ = onceBy_(sSwapCancel_);
+sSwapDecide_ = onceBy_(sSwapDecide_);
+sSwapUndo_ = onceBy_(sSwapUndo_);
+sSwapAdminDirect_ = onceBy_(sSwapAdminDirect_);
+cSwapRespond_ = onceBy_(cSwapRespond_);
+cSwapCancel_ = onceBy_(cSwapCancel_);
+cSwapDecide_ = onceBy_(cSwapDecide_);
+cSwapUndo_ = onceBy_(cSwapUndo_);
+cSwapAdminDirect_ = onceBy_(cSwapAdminDirect_);
+enSwapRespond_ = onceBy_(enSwapRespond_);
+enSwapCancel_ = onceBy_(enSwapCancel_);
+enSwapDecide_ = onceBy_(enSwapDecide_);
+enSwapUndo_ = onceBy_(enSwapUndo_);
+enSwapAdminDirect_ = onceBy_(enSwapAdminDirect_);
+nSwapRespond_ = onceBy_(nSwapRespond_);
+nSwapCancel_ = onceBy_(nSwapCancel_);
+nSwapDecide_ = onceBy_(nSwapDecide_);
+nSwapUndo_ = onceBy_(nSwapUndo_);
+nSwapAdminDirect_ = onceBy_(nSwapAdminDirect_);
+['s', 'c', 'en', 'n'].forEach(p=>{
+  guardSendButton_(p + '-perm-propose-btn', p + '-perm-status');
+  guardSendButton_(p + '-swap-propose-btn', p + '-swap-propose-status');
+  guardSendButton_(p + '-swap-admin-direct-btn', p + '-swap-admin-direct-status', '⏳ Aplicando…');
+});
+guardSendButton_('n-tipo-propose-btn', 'n-tipo-status');
 // Caixa do admin (painéis "Montar mês seguinte"): libera/bloqueia permutas, trocas e cessões do mês seguinte.
 async function loadSwapsOkChk_(chkId, statusId, keyBase, label){
   const chk = document.getElementById(chkId);
@@ -2700,8 +2793,10 @@ function permSetup_(cfg, month, roster, assignments, dayTypes, released, swapsOk
     const chk = permCheck_(cfg, freshAssign, freshTypes, month, me, X, B, Y);
     if(!chk.ok){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Não é possível propor: ' + chk.reason + '.'; return; }
     const fresh = await cfg.getSwaps(month);
-    fresh.push({ id: newSwapId_(), kind:'permuta', day: X, dayB: Y, fromName: me, toName: B,
-      status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
+    const newReq = { id: newSwapId_(), kind:'permuta', day: X, dayB: Y, fromName: me, toName: B,
+      status: 'aguardando_destino', createdAt: new Date().toISOString(), month };
+    if(dupOpenSwap_(fresh, newReq)){ statusEl.style.color = '#eab308'; statusEl.textContent = DUP_SWAP_MSG_; return; }
+    fresh.push(newReq);
     await cfg.setSwaps(month, fresh);
     logEvent('preenchimento', me, 'Propôs permuta do dia ' + X + ' pelo dia ' + Y + ' de ' + B + ' (' + cfg.label + ')');
     statusEl.style.color = '#22c55e';
@@ -4904,7 +4999,9 @@ async function loadSSwapsPanel(month){
       if(!day || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia e a pessoa.'; return; }
       if(await permIsReleasedFresh_(permCfg.relKey, month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
       const fresh = await getSSwaps(month);
-      fresh.push({ id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
+      const newReq = { id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month };
+      if(dupOpenSwap_(fresh, newReq)){ statusEl.style.color = '#eab308'; statusEl.textContent = DUP_SWAP_MSG_; return; }
+      fresh.push(newReq);
       await setSSwaps(month, fresh);
       logEvent('preenchimento', currentUserName, 'Propôs troca do dia ' + day + ' com ' + toName + ' (SUBSEGOP Serviço Mensal)');
       await loadSSwapsPanel(month);
@@ -6028,7 +6125,9 @@ async function loadCSwapsPanel(month){
       if(!day || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia e a pessoa.'; return; }
       if(await permIsReleasedFresh_(permCfg.relKey, month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
       const fresh = await getCSwaps(month);
-      fresh.push({ id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
+      const newReq = { id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month };
+      if(dupOpenSwap_(fresh, newReq)){ statusEl.style.color = '#eab308'; statusEl.textContent = DUP_SWAP_MSG_; return; }
+      fresh.push(newReq);
       await setCSwaps(month, fresh);
       logEvent('preenchimento', currentUserName, 'Propôs troca do dia ' + day + ' com ' + toName + ' (CEMADEN)');
       await loadCSwapsPanel(month);
@@ -7155,7 +7254,9 @@ async function loadENSwapsPanel(month){
       if(!day || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia e a pessoa.'; return; }
       if(await permIsReleasedFresh_(permCfg.relKey, month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
       const fresh = await getENSwaps(month);
-      fresh.push({ id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
+      const newReq = { id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month };
+      if(dupOpenSwap_(fresh, newReq)){ statusEl.style.color = '#eab308'; statusEl.textContent = DUP_SWAP_MSG_; return; }
+      fresh.push(newReq);
       await setENSwaps(month, fresh);
       logEvent('preenchimento', currentUserName, 'Propôs troca do dia ' + day + ' com ' + toName + ' (Adm Comitê El Niño)');
       await loadENSwapsPanel(month);
@@ -8214,7 +8315,9 @@ async function loadNSwapsPanel(month){
       if(!day || !toName){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Escolha o dia e a pessoa.'; return; }
       if(await nIsReleasedFresh_(month)){ statusEl.style.color = '#f87171'; statusEl.textContent = N_LOCK_MSG_; return; }
       const fresh = await getNSwaps(month);
-      fresh.push({ id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
+      const newReq = { id: newSwapId_(), day, fromName: currentUserName, toName, status: 'aguardando_destino', createdAt: new Date().toISOString(), month };
+      if(dupOpenSwap_(fresh, newReq)){ statusEl.style.color = '#eab308'; statusEl.textContent = DUP_SWAP_MSG_; return; }
+      fresh.push(newReq);
       await setNSwaps(month, fresh);
       logEvent('preenchimento', currentUserName, 'Propôs troca do dia ' + day + ' com ' + toName + ' (NIIAD)');
       await loadNSwapsPanel(month);
@@ -8525,8 +8628,10 @@ function nPermutaSetup_(month, roster, assignments, dayTypes, released, swapsOk)
     const chk = nPermutaCheck_(freshAssign, freshTypes, month, me, X, B, Y);
     if(!chk.ok){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Não é possível propor: ' + chk.reason + '.'; return; }
     const fresh = await getNSwaps(month);
-    fresh.push({ id: newSwapId_(), kind:'permuta', day: X, dayB: Y, fromName: me, toName: B, fromOrd: chk.tA, toOrd: chk.tB,
-      status: 'aguardando_destino', createdAt: new Date().toISOString(), month });
+    const newReq = { id: newSwapId_(), kind:'permuta', day: X, dayB: Y, fromName: me, toName: B, fromOrd: chk.tA, toOrd: chk.tB,
+      status: 'aguardando_destino', createdAt: new Date().toISOString(), month };
+    if(dupOpenSwap_(fresh, newReq)){ statusEl.style.color = '#eab308'; statusEl.textContent = DUP_SWAP_MSG_; return; }
+    fresh.push(newReq);
     await setNSwaps(month, fresh);
     logEvent('preenchimento', me, 'Propôs permuta do dia ' + X + ' pelo dia ' + Y + ' de ' + B + ' (NIIAD)');
     statusEl.style.color = '#22c55e';
@@ -8671,8 +8776,10 @@ function nTipoSetup_(month, assignments, dayTypes, released, swapsOk){
     const chk = nTipoCheck_(freshAssign, freshTypes, month, me, O, R);
     if(!chk.ok){ statusEl.style.color = '#f87171'; statusEl.textContent = 'Não é possível propor: ' + chk.reason + '.'; return; }
     const fresh = await getNSwaps(month);
-    fresh.push({ id: newSwapId_(), kind:'troca_tipo', day: O, dayB: R, fromName: me, toName: me,
-      status: 'aguardando_admin', createdAt: new Date().toISOString(), respondedAt: new Date().toISOString(), month });
+    const newReq = { id: newSwapId_(), kind:'troca_tipo', day: O, dayB: R, fromName: me, toName: me,
+      status: 'aguardando_admin', createdAt: new Date().toISOString(), respondedAt: new Date().toISOString(), month };
+    if(dupOpenSwap_(fresh, newReq)){ statusEl.style.color = '#eab308'; statusEl.textContent = DUP_SWAP_MSG_; return; }
+    fresh.push(newReq);
     await setNSwaps(month, fresh);
     logEvent('preenchimento', me, 'Propôs troca de tipo: dia ' + O + ' ORD → RAS e dia ' + R + ' RAS → ORD (NIIAD)');
     backendNotifySwapPendingAdmin('niiad', 'NIIAD', month, O, me, me, R, 'troca_tipo');
