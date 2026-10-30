@@ -2424,7 +2424,7 @@ function swapRowHtml_(req, buttonsHtml){
         ? `🔁 Permuta — Dia <strong>${origEsc_(req.day)}</strong> (<strong>${origEsc_(req.fromName)}</strong>${req.fromOrd == null ? '' : ', ' + (req.fromOrd ? 'ORD' : 'RAS')}) ⇄ Dia <strong>${origEsc_(req.dayB)}</strong> (<strong>${origEsc_(req.toName)}</strong>${req.toOrd == null ? '' : ', ' + (req.toOrd ? 'ORD' : 'RAS')})`
         : req.kind === 'troca_tipo'
         ? `🔀 Troca de tipo — <strong>${origEsc_(req.fromName)}</strong>: Dia <strong>${origEsc_(req.day)}</strong> (ORD → RAS) · Dia <strong>${origEsc_(req.dayB)}</strong> (RAS → ORD)`
-        : `Dia <strong>${origEsc_(req.day)}</strong>: <strong>${origEsc_(req.fromName)}</strong> → <strong>${origEsc_(req.toName)}</strong>`}
+        : `Dia <strong>${origEsc_(req.day)}</strong>${(req.typeLabel || req._type) ? ' (' + origEsc_(req.typeLabel || req._type) + ')' : ''}: <strong>${origEsc_(req.fromName)}</strong> → <strong>${origEsc_(req.toName)}</strong>`}
       <div style="font-size:11px;color:#64748b;">${origEsc_(SWAP_STATUS_LABELS_[req.status] || req.status)}</div>
       ${req._info ? `<div style="font-size:11px;color:#475569;">${req._info}</div>` : ''}
       ${req._warn ? `<div style="font-size:11px;color:#b45309;">⚠️ ${req._warn}</div>` : ''}
@@ -2534,6 +2534,14 @@ function cessaoWarnSetup_(p, assignments){
   const previewEl = document.getElementById(p + '-swap-preview');
   if(!daySel || !targetSel || !previewEl) return;
   const refresh = ()=>{
+    if(p === 'n'){
+      // NIIAD: o dia vai com o tipo (ORD/RAS) que eu tenho nele.
+      const o = daySel.value ? nCessaoIsOrd_(assignments, currentUserName, daySel.value) : null;
+      const w = (daySel.value && targetSel.value) ? nCessaoWarn_(assignments, currentUserName, targetSel.value, daySel.value) : '';
+      previewEl.innerHTML = (o === null ? '' : '<span style="color:var(--muted);">Este dia é <strong>' + (o ? 'ORD' : 'RAS') + '</strong> e será cedido com o mesmo tipo.</span>')
+        + (w ? '<br><span style="color:#fbbf24;">⚠️ ' + origEsc_(w) + ' O admin será avisado.</span>' : '');
+      return;
+    }
     const w = (daySel.value && targetSel.value) ? cessaoConsecWarn_(assignments, targetSel.value, daySel.value) : '';
     previewEl.innerHTML = w ? '<span style="color:#fbbf24;">⚠️ ' + origEsc_(w) + ' O admin será avisado.</span>' : '';
   };
@@ -8067,7 +8075,9 @@ async function loadNSwapsPanel(month){
       r._warn = nPermutaWarn_(r, assignments, dayTypes, month);
     }
     if(!r.kind && (r.status === 'aguardando_admin' || r.status === 'aguardando_destino')){
-      r._warn = cessaoConsecWarn_(assignments, r.toName, r.day);
+      r._warn = nCessaoWarn_(assignments, r.fromName, r.toName, r.day);
+      const o = nCessaoIsOrd_(assignments, r.fromName, r.day);
+      if(o !== null) r._type = o ? 'ORD' : 'RAS';
     }
     if(r.kind === 'troca_tipo' && r.status === 'aguardando_admin'){
       const t = nTipoInfo_(r, assignments, dayTypes, month);
@@ -8200,21 +8210,6 @@ async function nSwapRespond_(id, accept, month){
   await loadNSwapsPanel(month);
 }
 
-// NIIAD: pergunta SEMPRE como a vaga vai contar pra quem entra, em toda
-// troca (aprovação normal e troca direta do admin) — inclusive em dia
-// vermelho, onde a cota de Ordinário normalmente não vale (regra do
-// "Assumir vaga" avulso). Numa permuta autorizada pelo admin isso pode fazer
-// sentido de propósito (ex.: compensar um Ordinário de outro dia que fez
-// parte do acordo entre as duas pessoas) — por isso aqui o admin tem
-// liberdade pra decidir, mesmo sobrepondo essa distribuição. Retorna {isOrd}
-// ou null se quem decidiu desistiu (nesse caso nada foi alterado ainda).
-async function nAskSwapType_(day, toName, dayType){
-  const rasLabel = dayType === 'vermelho' ? 'Vermelho (RAS)' : 'Preto (RAS)';
-  const choice = await askChoice_('A vaga do dia ' + day + ' passa a contar como o quê pra ' + toName + '?', 'Ordinário', rasLabel);
-  if(choice === null) return null;
-  return { isOrd: choice === 'a' };
-}
-
 async function nSwapDecide_(id, approve, month){
   month = month || currentMonthISO_();
   const list = await getNSwaps(month);
@@ -8232,7 +8227,7 @@ async function nSwapDecide_(id, approve, month){
     await ensureOriginalSchedule_('niiad', month);
     const assignments = await getNAssignments(month);
     const slots = assignments[req.day] || [];
-    const consecWarn = cessaoConsecWarn_(assignments, req.toName, req.day);
+    const consecWarn = nCessaoWarn_(assignments, req.fromName, req.toName, req.day);
     if(consecWarn && !(await askConfirm('⚠️ Atenção:\n' + consecWarn + '\nAprovar a cessão mesmo assim?'))) return; // admin desistiu — pedido continua aguardando decisão
     const idx = slots.findIndex(raw=> nSlotName_(raw) === req.fromName);
     if(idx === -1 || nSlotNames_(slots).includes(req.toName)){
@@ -8247,18 +8242,14 @@ async function nSwapDecide_(id, approve, month){
       // igual já acontece no "Assumir vaga".
       const before = nSlotNames_(slots).join(', ');
       const norm = nNormalizeSlot_(slots[idx]);
-      const dayTypes = await getNDayTypes(month);
-      const dayType = nDayType(dayTypes, month, Number(req.day));
-      const decision = await nAskSwapType_(req.day, req.toName, dayType);
-      if(decision === null) return; // aprovador desistiu — pedido continua aguardando decisão
-      const isOrd = decision.isOrd;
+      const isOrd = !!norm.ord; // a cessão leva o tipo do cedente junto (sem perguntar)
       slots[idx] = { name: req.toName, ord: isOrd };
       assignments[req.day] = slots;
       await setNAssignments(month, assignments);
       req.status = 'aprovada';
       req.typeLabel = isOrd ? 'ORD' : 'RAS'; // NIIAD: só é ORD quando a vaga é Ordinário; preto e vermelho são RAS.
       req.fromOrd = !!norm.ord; // marcação que fromName tinha antes — usada pra restaurar certo se a troca for desfeita.
-      logEvent('admin', 'Admin', 'Aprovou troca (NIIAD) — dia ' + req.day + ': ' + before + ' → ' + nSlotNames_(slots).join(', ') + ' (' + req.typeLabel + ' para ' + req.toName + ')');
+      logEvent('admin', 'Admin', 'Aprovou cessão (NIIAD) — dia ' + req.day + ': ' + before + ' → ' + nSlotNames_(slots).join(', ') + ' (' + req.typeLabel + ' acompanha o dia, para ' + req.toName + ')');
       backendNotifySwapApproved('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName);
     }
   } else {
@@ -8309,6 +8300,23 @@ function nHasAdjacentRas_(assignments, name, day, ignoreDay){
       return s && s.name === name && !s.ord;
     });
   });
+}
+// Cessão no NIIAD: o dia passa pra quem recebe com o MESMO tipo (ORD/RAS) que o
+// cedente tinha — o serviço é transferido como está. Devolve true (ORD), false
+// (RAS) ou null se o cedente não está mais no dia.
+function nCessaoIsOrd_(assignments, fromName, day){
+  const s = (assignments[String(day)] || []).map(nNormalizeSlot_).find(x=> x && x.name === fromName);
+  return s ? !!s.ord : null;
+}
+// Aviso (ao admin) só quando o tipo herdado é RAS e quem recebe já tem RAS ao lado
+// — ORD pode ficar ao lado de qualquer coisa.
+function nCessaoWarn_(assignments, fromName, toName, day){
+  const isOrd = nCessaoIsOrd_(assignments, fromName, day);
+  if(isOrd === null || isOrd) return '';
+  const d = Number(day);
+  if(!nHasAdjacentRas_(assignments, toName, d, null)) return '';
+  const nb = consecNeighbors_(assignments, toName, d, null);
+  return toName + ' ficaria com RAS em dias consecutivos (dia ' + d + ' junto com o dia ' + nb.join(' e ') + ').';
 }
 
 // Valida uma permuta e devolve {ok, reason, tA, tB, warns}. Só RAS não pode
@@ -8686,11 +8694,7 @@ async function nSwapAdminDirect_(month){
     return;
   }
   const norm = nNormalizeSlot_(slots[idx]);
-  const dayTypes = await getNDayTypes(month);
-  const dayType = nDayType(dayTypes, month, Number(day));
-  const decision = await nAskSwapType_(day, toName, dayType);
-  if(decision === null) return; // admin desistiu — nada foi alterado ainda
-  const isOrd = decision.isOrd;
+  const isOrd = !!norm.ord; // o dia cedido leva o tipo do cedente
   const before = nSlotNames_(slots).join(', ');
   slots[idx] = { name: toName, ord: isOrd };
   assignments[day] = slots;
