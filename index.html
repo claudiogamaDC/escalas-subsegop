@@ -146,6 +146,13 @@
   .swap-card-head .ttl{display:block;font-size:17px;font-weight:700;color:var(--text);}
   .swap-card-head .sub{display:block;margin-top:3px;font-size:12px;font-weight:400;color:var(--muted);line-height:1.4;}
   .swap-card .save-btn{background:var(--sw);}
+  /* Seletor de mês (Escala Compilada e Trocas): rótulo maior e com ícone */
+  .month-picker{display:inline-flex;align-items:center;gap:8px;margin:0;font-size:15px;font-weight:700;color:var(--text);}
+  .month-picker-ico{font-size:20px;line-height:1;}
+  .month-picker select{margin-left:2px;font-weight:400;}
+  .month-card-head{display:flex;align-items:center;gap:10px;margin:0 0 10px;font-size:inherit;}
+  .month-card-head .ico{font-size:24px;line-height:1;}
+  .month-card-head .ttl{font-size:18px;font-weight:700;color:var(--text);}
   .roster-row{display:flex;flex-wrap:wrap;gap:8px;margin-bottom:8px;align-items:center;}
   .roster-row input{flex:1;min-width:140px;}
   .roster-row select{width:140px;flex:none;}
@@ -772,7 +779,7 @@
 <div class="panel" id="panel-compiled-subsegop-serv">
   <div class="count-badge" id="s-count-badge">Carregando...</div>
   <div class="toolbar">
-    <label style="font-size:12px;color:var(--muted);margin:0;">Mês <select id="s-compiled-month-select" style="margin-left:4px;"></select></label>
+    <label class="month-picker"><span class="month-picker-ico">📅</span><span class="month-picker-txt">Mês</span> <select id="s-compiled-month-select"></select></label>
     <button class="primary" id="s-export-btn">Baixar como imagem (PNG)</button>
     <button id="s-export-csv-btn">Baixar como Excel (XLSX)</button>
     <button id="s-refresh-btn">Atualizar</button>
@@ -800,7 +807,7 @@
 <!-- ======================= SUBSEGOP SERVIÇO MENSAL: TROCAS ======================= -->
 <div class="panel" id="panel-swaps-subsegop-serv">
   <div class="roster-card">
-    <label style="margin-top:0;">Mês</label>
+    <label class="month-card-head"><span class="ico">📅</span><span class="ttl">Mês</span></label>
     <select id="s-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
@@ -1028,7 +1035,7 @@
 <div class="panel" id="panel-compiled-cemaden">
   <div class="count-badge" id="c-count-badge">Carregando...</div>
   <div class="toolbar">
-    <label style="font-size:12px;color:var(--muted);margin:0;">Mês <select id="c-compiled-month-select" style="margin-left:4px;"></select></label>
+    <label class="month-picker"><span class="month-picker-ico">📅</span><span class="month-picker-txt">Mês</span> <select id="c-compiled-month-select"></select></label>
     <button class="primary" id="c-export-btn">Baixar como imagem (PNG)</button>
     <button id="c-export-csv-btn">Baixar como Excel (XLSX)</button>
     <button id="c-refresh-btn">Atualizar</button>
@@ -1055,7 +1062,7 @@
 <!-- ======================= CEMADEN: TROCAS ======================= -->
 <div class="panel" id="panel-swaps-cemaden">
   <div class="roster-card">
-    <label style="margin-top:0;">Mês</label>
+    <label class="month-card-head"><span class="ico">📅</span><span class="ttl">Mês</span></label>
     <select id="c-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
@@ -1326,7 +1333,7 @@
 <div class="panel" id="panel-compiled-elnino">
   <div class="count-badge" id="en-count-badge">Carregando...</div>
   <div class="toolbar">
-    <label style="font-size:12px;color:var(--muted);margin:0;">Mês <select id="en-compiled-month-select" style="margin-left:4px;"></select></label>
+    <label class="month-picker"><span class="month-picker-ico">📅</span><span class="month-picker-txt">Mês</span> <select id="en-compiled-month-select"></select></label>
     <button class="primary" id="en-export-btn">Baixar como imagem (PNG)</button>
     <button id="en-export-csv-btn">Baixar como Excel (XLSX)</button>
     <button id="en-refresh-btn">Atualizar</button>
@@ -1353,7 +1360,7 @@
 <!-- ======================= ADM COMITÊ EL NIÑO: TROCAS ======================= -->
 <div class="panel" id="panel-swaps-elnino">
   <div class="roster-card">
-    <label style="margin-top:0;">Mês</label>
+    <label class="month-card-head"><span class="ico">📅</span><span class="ttl">Mês</span></label>
     <select id="en-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
@@ -1581,7 +1588,7 @@
 <div class="panel" id="panel-compiled-niiad">
   <div class="count-badge" id="n-count-badge">Carregando...</div>
   <div class="toolbar">
-    <label style="font-size:12px;color:var(--muted);margin:0;">Mês <select id="n-compiled-month-select" style="margin-left:4px;"></select></label>
+    <label class="month-picker"><span class="month-picker-ico">📅</span><span class="month-picker-txt">Mês</span> <select id="n-compiled-month-select"></select></label>
     <button class="primary" id="n-export-btn">Baixar como imagem (PNG)</button>
     <button id="n-export-csv-btn">Baixar como Excel (XLSX)</button>
     <button id="n-refresh-btn">Atualizar</button>
@@ -1607,7 +1614,7 @@
 <!-- ======================= NIIAD: TROCAS ======================= -->
 <div class="panel" id="panel-swaps-niiad">
   <div class="roster-card">
-    <label style="margin-top:0;">Mês</label>
+    <label class="month-card-head"><span class="ico">📅</span><span class="ttl">Mês</span></label>
     <select id="n-swap-month-select"></select>
     <p style="font-size:11px;color:var(--muted);margin:6px 0 0;">Trocas valem no mês vigente e, quando o admin liberar, no mês seguinte; fora disso a tela é só consulta.</p>
   </div>
