@@ -55,6 +55,9 @@
   .tab-group-row{display:flex;gap:8px;flex-wrap:wrap;margin-top:8px;}
   .tab{padding:10px 18px;background:var(--card);border:1px solid var(--border);border-radius:8px;cursor:pointer;font-size:14px;color:var(--muted);border-left-width:4px;}
   .tab.active{background:var(--accent);color:white;border-color:var(--accent);}
+  .tab{position:relative;}
+  .tab-badge{position:absolute;top:-9px;right:-7px;min-width:21px;height:21px;padding:0 6px;border-radius:999px;background:#dc2626;color:#fff;font-size:12px;font-weight:700;line-height:21px;text-align:center;box-shadow:0 0 0 2px var(--card);pointer-events:none;}
+  .tab-badge--user{background:#2563eb;}
   /* Agrupamento visual de abas correlatas (mesmo assunto/mês) por cor da
      borda esquerda — ex.: "Meus serviços" e "Configurar Serviço Mensal" são
      do mesmo grupo (mês vigente), enquanto "... próximo mês"/"Montar mês
@@ -2941,6 +2944,80 @@ function enterApp(session){
   document.getElementById('app-content').style.display = 'block';
   saveSession();
   applyRoleVisibility();
+  startSwapBadges_();
+}
+
+/* ---------- Marcador de pendências nas abas "Trocas" ----------
+   Admin: nº de pedidos aguardando a sua aprovação (mês vigente + seguinte).
+   Usuário: nº de pedidos de outras pessoas esperando a sua resposta. */
+const SWAP_BADGE_GROUPS_ = [
+  { panel:'swaps-subsegop-serv', setor:'subsegop', swaps:()=> K_S_SWAPS,  ok:()=> K_S_SWAPSOK },
+  { panel:'swaps-cemaden',       setor:'cemaden',  swaps:()=> K_C_SWAPS,  ok:()=> K_C_SWAPSOK },
+  { panel:'swaps-elnino',        setor:'cemaden',  swaps:()=> K_EN_SWAPS, ok:()=> K_EN_SWAPSOK },
+  { panel:'swaps-niiad',         setor:'niiad',    swaps:()=> K_N_SWAPS,  ok:()=> K_N_SWAPSOK }
+];
+let swapBadgeTimer_ = null;
+let swapBadgeVisibilityBound_ = false;
+function setSwapBadge_(panel, count, kind){
+  const tab = document.querySelector('.tab[data-panel="' + panel + '"]');
+  if(!tab) return;
+  let b = tab.querySelector('.tab-badge');
+  if(!count){ if(b) b.remove(); return; }
+  if(!b){ b = document.createElement('span'); tab.appendChild(b); }
+  b.className = 'tab-badge' + (kind === 'user' ? ' tab-badge--user' : '');
+  b.textContent = count > 9 ? '9+' : String(count);
+  b.title = kind === 'user'
+    ? count + ' pedido(s) esperando a sua resposta'
+    : count + ' pedido(s) aguardando a sua aprovação';
+}
+function clearSwapBadges_(){
+  SWAP_BADGE_GROUPS_.forEach(g=> setSwapBadge_(g.panel, 0));
+}
+async function refreshSwapBadges_(){
+  const isAdmin = currentRole === 'admin', isUser = currentRole === 'user';
+  if(!sessionToken_ || (!isAdmin && !isUser)){ clearSwapBadges_(); return; }
+  const cur = currentMonthISO_(), nxt = nextMonthISO_(cur);
+  const groups = SWAP_BADGE_GROUPS_.filter(g=> isAdmin
+    ? (!currentAdminSetor || currentAdminSetor === g.setor)
+    : currentGroups.includes(g.setor));
+  SWAP_BADGE_GROUPS_.filter(g=> !groups.includes(g)).forEach(g=> setSwapBadge_(g.panel, 0));
+  if(!groups.length) return;
+  const keys = [];
+  groups.forEach(g=>{
+    [cur, nxt].forEach(m=> keys.push(monthKey_(g.swaps(), m)));
+    keys.push(monthKey_(g.ok(), nxt));
+  });
+  try{
+    const batch = await window.storage.getBatch(keys);
+    groups.forEach(g=>{
+      const nextOk = parseBatchValue_(batch, monthKey_(g.ok(), nxt), false) === true;
+      let count = 0;
+      [cur, nxt].forEach(m=>{
+        const list = parseBatchValue_(batch, monthKey_(g.swaps(), m), []);
+        if(!Array.isArray(list)) return;
+        if(isAdmin){
+          count += list.filter(r=> r && r.status === 'aguardando_admin').length;
+        } else if(swapActionsOpen_(m, nextOk)){
+          count += list.filter(r=> r && r.status === 'aguardando_destino' && nameKey_(r.toName) === nameKey_(currentUserName)).length;
+        }
+      });
+      setSwapBadge_(g.panel, count, isAdmin ? 'admin' : 'user');
+    });
+  }catch(e){ /* sem marcador desta vez; tenta de novo no próximo ciclo */ }
+}
+function startSwapBadges_(){
+  refreshSwapBadges_();
+  if(!swapBadgeTimer_){
+    swapBadgeTimer_ = setInterval(()=>{ if(document.visibilityState === 'visible') refreshSwapBadges_(); }, 120000);
+  }
+  if(!swapBadgeVisibilityBound_){
+    swapBadgeVisibilityBound_ = true;
+    document.addEventListener('visibilitychange', ()=>{ if(document.visibilityState === 'visible' && swapBadgeTimer_) refreshSwapBadges_(); });
+  }
+}
+function stopSwapBadges_(){
+  if(swapBadgeTimer_){ clearInterval(swapBadgeTimer_); swapBadgeTimer_ = null; }
+  clearSwapBadges_();
 }
 
 function applyRoleVisibility(){
@@ -3084,6 +3161,7 @@ document.getElementById('login-name-select').addEventListener('focus', ()=>{
 });
 
 function logout(){
+  stopSwapBadges_();
   clearSession();
   currentRole = null; currentGroups = []; currentLevels = {}; currentUserName = null; currentAdminPassword = null; currentAdminSetor = null; currentGestorPassword = null; sessionToken_ = null;
   document.getElementById('app-content').style.display = 'none';
@@ -3474,6 +3552,7 @@ setTimeout(function resumeSession(){
     document.getElementById('lock-screen').style.display = 'none';
     document.getElementById('app-content').style.display = 'block';
     applyRoleVisibility();
+    startSwapBadges_();
   } else {
     populateLoginNameSelect();
   }
@@ -4780,6 +4859,7 @@ async function setSSwaps(month, list){ return setSwapList_(monthKey_(K_S_SWAPS, 
 
 async function loadSSwapsPanel(month){
   month = month || currentMonthISO_();
+  refreshSwapBadges_();
   const isAdmin = currentRole === 'admin';
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
@@ -5907,6 +5987,7 @@ async function setCSwaps(month, list){ return setSwapList_(monthKey_(K_C_SWAPS, 
 
 async function loadCSwapsPanel(month){
   month = month || currentMonthISO_();
+  refreshSwapBadges_();
   const isAdmin = currentRole === 'admin';
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
@@ -7033,6 +7114,7 @@ async function setENSwaps(month, list){ return setSwapList_(monthKey_(K_EN_SWAPS
 
 async function loadENSwapsPanel(month){
   month = month || currentMonthISO_();
+  refreshSwapBadges_();
   const isAdmin = currentRole === 'admin';
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
@@ -8075,6 +8157,7 @@ async function setNSwaps(month, list){ return setSwapList_(monthKey_(K_N_SWAPS, 
 
 async function loadNSwapsPanel(month){
   month = month || currentMonthISO_();
+  refreshSwapBadges_();
   const isAdmin = currentRole === 'admin';
   const isSupervisor = currentRole === 'supervisor';
   const isCurrentMonth = month === currentMonthISO_();
