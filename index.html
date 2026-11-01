@@ -504,6 +504,7 @@
       <div class="tab tab-grp-subsegop-serv" data-panel="swaps-subsegop-serv" data-group="subsegop">Trocas de plantão</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="admin-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar Serviço Mensal</div>
       <div class="tab tab-grp-proximo" data-panel="fill-subsegop-serv-next" data-group="subsegop">Meus serviços — próximo mês</div>
+      <div class="tab tab-grp-mes-atual" data-panel="fill-subsegop-serv" data-group="subsegop" data-open-check="s" style="display:none;">Meus serviços — mês em vigor (liberado)</div>
       <div class="tab tab-grp-proximo" data-panel="admin-subsegop-serv-next" data-admin-only="true" data-admin-only-setor="subsegop">Montar mês seguinte</div>
       <div class="tab" data-panel="originais-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Escalas Originais</div>
       <div class="tab tab-grp-mes-atual" data-panel="fill-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar mês atual SUBSEGOP</div>
@@ -520,7 +521,9 @@
       <div class="tab tab-grp-elnino-atual" data-panel="swaps-elnino" data-group="cemaden">Trocas — Comitê El Niño</div>
       <div class="tab tab-grp-elnino-atual" data-panel="admin-elnino" data-admin-only="true" data-admin-only-setor="cemaden">Configurar El Niño</div>
       <div class="tab tab-grp-proximo-fill" data-panel="fill-cemaden-next" data-group="cemaden">Serviço CEMADEN — próximo mês</div>
+      <div class="tab tab-grp-mes-atual" data-panel="fill-cemaden" data-group="cemaden" data-open-check="c" style="display:none;">Serviço CEMADEN — mês em vigor (liberado)</div>
       <div class="tab tab-grp-proximo-fill" data-panel="fill-elnino-next" data-group="cemaden">Serviço El Niño — próximo mês</div>
+      <div class="tab tab-grp-mes-atual" data-panel="fill-elnino" data-group="cemaden" data-open-check="en" style="display:none;">Serviço El Niño — mês em vigor (liberado)</div>
       <div class="tab tab-grp-proximo-admin" data-panel="admin-cemaden-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (CEMADEN)</div>
       <div class="tab tab-grp-proximo-admin" data-panel="admin-elnino-next" data-admin-only="true" data-admin-only-setor="cemaden">Montar mês seguinte (El Niño)</div>
       <div class="tab" data-panel="originais-cemaden" data-admin-only="true" data-admin-only-setor="cemaden">Escalas Originais</div>
@@ -536,6 +539,7 @@
       <div class="tab tab-grp-atual" data-panel="swaps-niiad" data-group="niiad">Trocas de plantão</div>
       <div class="tab tab-grp-atual" data-panel="admin-niiad" data-admin-only="true" data-admin-only-setor="niiad">Configurar NIIAD</div>
       <div class="tab tab-grp-proximo" data-panel="fill-niiad-next" data-group="niiad">Meus Serviços — próximo mês</div>
+      <div class="tab tab-grp-mes-atual" data-panel="fill-niiad" data-group="niiad" data-open-check="n" style="display:none;">Meus Serviços — mês em vigor (liberado)</div>
       <div class="tab tab-grp-proximo" data-panel="admin-niiad-next" data-admin-only="true" data-admin-only-setor="niiad">Montar mês seguinte</div>
       <div class="tab" data-panel="originais-niiad" data-admin-only="true" data-admin-only-setor="niiad">Escalas Originais</div>
       <div class="tab tab-grp-mes-atual" data-panel="fill-niiad" data-admin-only="true" data-admin-only-setor="niiad">Configurar mês atual NIIAD</div>
@@ -3168,6 +3172,10 @@ function applyRoleVisibility(){
       visible = !adminOnly && group && currentGroups.includes(group)
         && (!levelOnly || currentLevels[group] === levelOnly);
     }
+    // Abas "mês em vigor (liberado)": só pra usuário comum, e só enquanto o
+    // admin mantiver a caixa "Liberar preenchimento" do mês em vigor ligada
+    // (uso emergencial quando a escala não terminou de ser preenchida).
+    if(tab.dataset.openCheck) visible = visible && !isAdmin && !!openCurrentFill_[tab.dataset.openCheck];
     tab.style.display = visible ? '' : 'none';
     if(visible && !firstVisible) firstVisible = tab;
   });
@@ -3177,6 +3185,30 @@ function applyRoleVisibility(){
     grp.style.display = anyVisible ? '' : 'none';
   });
   if(firstVisible) firstVisible.click();
+  if(!isAdmin && !isSupervisor && !isGestor) refreshOpenCurrentFillTabs_();
+}
+
+// Quais grupos estão com o preenchimento do MÊS EM VIGOR liberado (s=SUBSEGOP
+// serviço mensal, c=CEMADEN, en=El Niño, n=NIIAD). Só decide a visibilidade
+// das abas "mês em vigor (liberado)"; a permissão real continua no backend.
+const openCurrentFill_ = {};
+async function refreshOpenCurrentFillTabs_(){
+  const month = currentMonthISO_();
+  const checks = { s: getSReleased, c: getCReleased, en: getENReleased, n: getNReleased };
+  let changed = false;
+  await Promise.all(Object.keys(checks).map(async key=>{
+    const open = await checks[key](month);
+    if(open !== !!openCurrentFill_[key]){ openCurrentFill_[key] = open; changed = true; }
+  }));
+  if(!changed) return;
+  document.querySelectorAll('.tab[data-open-check]').forEach(tab=>{
+    const group = tab.dataset.group;
+    tab.style.display = (currentRole === 'user' && currentGroups.includes(group) && openCurrentFill_[tab.dataset.openCheck]) ? '' : 'none';
+  });
+  document.querySelectorAll('.tab-group').forEach(grp=>{
+    const anyVisible = Array.from(grp.querySelectorAll('.tab')).some(t=> t.style.display !== 'none');
+    grp.style.display = anyVisible ? '' : 'none';
+  });
 }
 
 function showAdminLoginForm(){
