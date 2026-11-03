@@ -500,6 +500,7 @@
     <div class="tab-group-row">
       <div class="tab tab-grp-expediente" data-panel="fill-subsegop" data-group="subsegop">Meus Expedientes</div>
       <div class="tab tab-grp-expediente" data-panel="admin-subsegop" data-admin-only="true" data-admin-only-setor="subsegop">Configurar SUBSEGOP</div>
+      <div class="tab tab-grp-expediente" data-panel="admin-subsegop" data-responsavel-only="true">Configurar semana</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="compiled-subsegop-serv" data-group="subsegop">Escala Compilada SUBSEGOP</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="swaps-subsegop-serv" data-group="subsegop">Trocas de plantão</div>
       <div class="tab tab-grp-subsegop-serv" data-panel="admin-subsegop-serv" data-admin-only="true" data-admin-only-setor="subsegop">Configurar Serviço Mensal</div>
@@ -630,7 +631,7 @@
 
 <!-- ======================= SUBSEGOP: ADMIN ======================= -->
 <div class="panel" id="panel-admin-subsegop">
-  <div class="roster-card">
+  <div class="roster-card adm-only-card">
     <label style="margin-top:0;">Senha de supervisão do setor (consulta, sem editar nada)</label>
     <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
       <span id="sup-status-subsegop" style="font-size:13px;color:var(--muted);">Carregando...</span>
@@ -639,7 +640,7 @@
     <button class="save-btn" id="sup-save-subsegop" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar senha de supervisão</button>
     <div class="status" id="sup-status-msg-subsegop"></div>
   </div>
-  <div class="roster-card">
+  <div class="roster-card adm-only-card">
     <label style="margin-top:0;">Aviso por e-mail de troca de plantão</label>
     <label style="margin-top:8px;font-size:12px;font-weight:400;">E-mail da Supervisão (avisado quando uma troca for aprovada)</label>
     <input type="email" id="notify-sup-email-subsegop" placeholder="supervisao@exemplo.gov.br" style="max-width:320px;">
@@ -650,7 +651,7 @@
     <button class="save-btn" id="notify-save-subsegop" style="margin-top:8px;width:auto;padding:8px 16px;">Salvar e-mails de aviso</button>
     <div class="status" id="notify-status-msg-subsegop"></div>
   </div>
-  <div class="roster-card" id="admin-pw-card-subsegop">
+  <div class="roster-card adm-only-card" id="admin-pw-card-subsegop">
     <label style="margin-top:0;">Acesso de administrador deste setor</label>
     <div id="admin-pw-master-block-subsegop" style="display:none;">
       <input type="password" id="admin-pw-master-input-subsegop" placeholder="Redefinir senha do admin de SUBSEGOP" style="max-width:280px;">
@@ -664,7 +665,7 @@
       <div class="status" id="admin-pw-self-msg-subsegop"></div>
     </div>
   </div>
-  <div class="roster-card">
+  <div class="roster-card adm-only-card">
     <label style="margin-top:0;">Liberação para preenchimento</label>
     <div style="display:flex;align-items:center;gap:12px;flex-wrap:wrap;">
       <span id="release-status-text" style="font-size:14px;font-weight:600;">Carregando...</span>
@@ -695,7 +696,7 @@
     <div class="status" id="clear-data-status"></div>
   </div>
 
-  <div class="roster-card">
+  <div class="roster-card adm-only-card">
     <label style="margin-top:0;">Efetivo (identificação)</label>
     <p style="font-size:11px;color:var(--muted);margin:0 0 10px;">Este painel é só de <strong>identificação</strong> do efetivo: nome, posto/graduação, tipo de usuário e senha. O <strong>posto/graduação</strong> define a ordem de antiguidade na lista e na Escala Compilada (Cel → Sd) e também define automaticamente se a pessoa entra como Oficial ou Praça. Dentro do mesmo posto, use as setas <strong>▲▼</strong> pra colocar quem é mais antigo em cima. Campo "Nova senha": deixe em branco para manter a senha atual da pessoa. Se ela ainda não tiver senha, precisa cadastrar uma aqui antes que ela consiga entrar. A mesma senha vale se a pessoa também estiver na lista do CEMADEN.<br><strong>Usuário simples</strong> só marca os próprios dias e só visualiza a Escala Compilada. <strong>Usuário responsável</strong> pode marcar por qualquer pessoa e exportar a Escala Compilada (PNG/CSV).<br>Quem participa do <strong>Serviço Mensal</strong> e as cotas de cada um (preta/sexta/vermelha) são definidas à parte, em "Configurar Serviço Mensal" (mês vigente) ou "Montar mês seguinte".</p>
     <div id="roster-list"></div>
@@ -3172,6 +3173,10 @@ function applyRoleVisibility(){
       visible = !adminOnly && group && currentGroups.includes(group)
         && (!levelOnly || currentLevels[group] === levelOnly);
     }
+    // "Configurar semana": só pro Responsável da SUBSEGOP (admin usa "Configurar SUBSEGOP").
+    if(tab.dataset.responsavelOnly === 'true'){
+      visible = !isAdmin && !isSupervisor && !isGestor && currentLevels.subsegop === 'responsavel';
+    }
     // Abas "mês em vigor (liberado)": só pra usuário comum, e só enquanto o
     // admin mantiver a caixa "Liberar preenchimento" do mês em vigor ligada
     // (uso emergencial quando a escala não terminou de ser preenchida).
@@ -4549,9 +4554,14 @@ function wireSectorAdminPasswordCard_(setor){
 
 /* ---------- SUBSEGOP: aba Configurar (admin) ---------- */
 async function loadRosterPanel(){
-  wireSupervisorPasswordCard_('subsegop');
-  wireSectorNotifyEmailsCard_('subsegop');
-  wireSectorAdminPasswordCard_('subsegop');
+  // Responsável vê só semana, dias e "limpar"; o resto do painel é do admin.
+  const adminView = currentRole === 'admin';
+  document.querySelectorAll('#panel-admin-subsegop .adm-only-card').forEach(c=> c.style.display = adminView ? '' : 'none');
+  if(adminView){
+    wireSupervisorPasswordCard_('subsegop');
+    wireSectorNotifyEmailsCard_('subsegop');
+    wireSectorAdminPasswordCard_('subsegop');
+  }
   const { weekStart, released, activeDays, roster } = await getExpedienteBundle_();
   const weekInput = document.getElementById('week-start');
   weekInput.value = weekStart ? weekStart : getNextMondayISO();
