@@ -2007,6 +2007,7 @@ async function backendSet(key, value){
   const data = await res.json();
   handleSessionExpired_(data);
   if(!data.ok) throw new Error(data.error || "erro desconhecido");
+  return data;
 }
 // Busca várias chaves numa única ida ao servidor — usado pelas telas de
 // "escolher serviço", que antes disparavam 5+ chamadas separadas (uma por
@@ -2051,7 +2052,7 @@ window.storage = {
     return (value === null || value === undefined) ? null : { value: cleanStoredValue_(key, value) };
   },
   async set(key, value, _isPublic){
-    await backendSet(key, value);
+    return await backendSet(key, value);
   },
   // Mesma forma de retorno do get() (objeto {value} por chave, ou null),
   // só que buscando todas as chaves de uma vez.
@@ -2142,6 +2143,10 @@ document.addEventListener('click', (e)=>{
   const b = e.target && e.target.closest ? e.target.closest('button[data-accept],button[data-reject],button[data-cancel],button[data-approve],button[data-deny],button[data-undo]') : null;
   lastActionBtn_ = b ? { b, t: Date.now() } : null;
 }, true);
+// Fila única: as ações de troca (aceitar, cancelar, aprovar, desfazer, troca direta) rodam uma de
+// cada vez nesta aba. Antes, duas aprovações seguidas liam a mesma lista e a última a gravar
+// apagava a decisão da anterior.
+let swapOpChain_ = Promise.resolve();
 function onceBy_(fn){
   const running = new Set();
   return async function(...args){
@@ -2151,7 +2156,10 @@ function onceBy_(fn){
     const hit = (lastActionBtn_ && Date.now() - lastActionBtn_.t < 300) ? lastActionBtn_.b : null;
     const label = hit ? hit.textContent : null;
     if(hit){ hit.classList.add('is-busy'); hit.disabled = true; hit.textContent = '⏳'; }
-    try{ return await fn.apply(this, args); }
+    const self = this;
+    const run = swapOpChain_.then(()=> fn.apply(self, args));
+    swapOpChain_ = run.catch(()=>{});
+    try{ return await run; }
     finally{
       running.delete(key);
       if(hit && hit.isConnected){ hit.classList.remove('is-busy'); hit.disabled = false; hit.textContent = label; }
@@ -2369,6 +2377,15 @@ async function backendSendDailyReportNow(date, recipients, password){
   if(!res.ok) throw new Error("HTTP " + res.status);
   return await res.json();
 }
+// E-mails de troca aprovada ficam em espera e só saem DEPOIS que o registro da troca foi salvo
+// (ver saveDecidedSwap_). Se o registro falhar, nada é enviado.
+let deferredNotifies_ = [];
+function notifyAfterSave_(fn){ deferredNotifies_.push(fn); }
+function dropNotifies_(){ deferredNotifies_ = []; }
+function flushNotifies_(){
+  const fns = deferredNotifies_; deferredNotifies_ = [];
+  fns.forEach(fn=>{ try{ fn(); }catch(e){ console.error(e); } });
+}
 async function backendNotifySwapApproved(setor, groupLabel, month, day, fromName, toName, dayB, kind){
   // Best effort: se falhar, não deve travar a troca (que já foi aprovada e gravada antes desta chamada).
   try{
@@ -2526,7 +2543,12 @@ async function getSwapList_(key, rosterKey){
   }
   catch(e){ return []; }
 }
-async function setSwapList_(key, list){ await window.storage.set(key, JSON.stringify(list), true); }
+// Devolve a lista como o servidor a deixou gravada (o servidor mescla por id e nunca perde
+// uma decisão já registrada), ou null se o servidor não informou.
+async function setSwapList_(key, list){
+  const res = await window.storage.set(key, JSON.stringify(list), true);
+  return (res && Array.isArray(res.merged)) ? res.merged : null;
+}
 
 const SWAP_STATUS_LABELS_ = {
   aguardando_destino: '🟡 Aguardando resposta de quem vai receber o dia',
@@ -2562,12 +2584,42 @@ function swapRowHtml_(req, buttonsHtml){
 const SWAP_HISTORY_STATUSES_ = ['recusada_destino', 'recusada_admin', 'cancelada', 'desfeita', 'erro_ao_aplicar'];
 // Mensagem visível na hora, logo após o admin aprovar/recusar — sem isso,
 // um "erro_ao_aplicar" (a vaga já tinha mudado) passava batido em silêncio.
+// Grava a lista de trocas depois de uma decisão do admin. Só dispara os e-mails se o registro foi
+// salvo e continua com o status decidido; senão avisa o admin e descarta os e-mails em espera.
+async function saveDecidedSwap_(setFn, month, list, req, statusElId){
+  const el = document.getElementById(statusElId);
+  let merged = null;
+  try{
+    merged = await setFn(month, list);
+  }catch(e){
+    dropNotifies_();
+    if(el){
+      el.style.color = '#f87171';
+      el.textContent = '⚠️ A escala foi alterada, mas não foi possível salvar o registro da troca (' + (e && e.message ? e.message : 'erro de rede') + '). Clique em Aprovar de novo neste pedido: o sistema só registra a aprovação, sem mexer na escala e sem reenviar e-mail.';
+    }
+    return false;
+  }
+  const saved = Array.isArray(merged) ? merged.find(r=> r && r.id === req.id) : null;
+  if(saved && saved.status !== req.status){
+    dropNotifies_();
+    if(el){
+      el.style.color = '#f87171';
+      el.textContent = '⚠️ Este pedido já tinha sido decidido por outra ação (agora consta como: ' + (SWAP_STATUS_LABELS_[saved.status] || saved.status) + '). Nenhum e-mail foi enviado. Confira a escala.';
+    }
+    return false;
+  }
+  flushNotifies_();
+  return true;
+}
 function showSwapDecideStatus_(elId, req){
   const el = document.getElementById(elId);
   if(!el) return;
   let color = 'var(--muted)', text = '';
   if(req.status === 'aprovada'){
-    color = '#22c55e'; text = '✅ Troca aprovada e aplicada na escala (dia ' + req.day + ').';
+    color = '#22c55e';
+    text = req.reconciled
+      ? '✅ A escala já refletia esta troca (dia ' + req.day + '): ela foi apenas registrada como aprovada. Nenhum e-mail foi reenviado.'
+      : '✅ Troca aprovada e aplicada na escala (dia ' + req.day + ').';
   } else if(req.status === 'recusada_admin'){
     color = '#f87171'; text = '🔴 Troca do dia ' + req.day + ' recusada.';
   } else if(req.status === 'erro_ao_aplicar'){
@@ -2587,10 +2639,14 @@ function renderSwapHistory_(elId, swaps){
     : '<p style="color:#64748b;font-size:13px;margin:0;">Nada no histórico ainda.</p>';
 }
 
-function swapListHtml_(list, emptyMsg, buttonsFor){
+// keepOrder: mantém a ordem recebida (usado nas aprovadas, que vêm em ordem de aprovação).
+function swapListHtml_(list, emptyMsg, buttonsFor, keepOrder){
   if(!list.length) return `<p style="color:#64748b;font-size:13px;margin:0;">${emptyMsg}</p>`;
-  return list.slice().reverse().map(req=> swapRowHtml_(req, buttonsFor ? buttonsFor(req) : '')).join('');
+  return (keepOrder ? list.slice() : list.slice().reverse()).map(req=> swapRowHtml_(req, buttonsFor ? buttonsFor(req) : '')).join('');
 }
+// Ordem em que o admin autorizou as trocas (decidedAt é gravado no instante da decisão).
+function swapApprovalKey_(r){ return String(r.decidedAt || r.respondedAt || r.createdAt || ''); }
+function swapApprovalOrder_(a, b){ const x = swapApprovalKey_(a), y = swapApprovalKey_(b); return x < y ? -1 : x > y ? 1 : 0; }
 // Card "Admin: aplicar troca diretamente" (item novo — admin propõe E
 // autoriza numa ação só, sem esperar quem sai/quem entra aceitar). Genérico
 // pros 4 grupos: cada um só passa sua função XSlotNames_ (todos têm essa
@@ -2735,7 +2791,9 @@ function permAnnotate_(cfg, swaps, assignments, dayTypes, month){
       return;
     }
     const chk = permCheck_(cfg, assignments, dayTypes, month, r.fromName, r.day, r.toName, r.dayB);
-    r._warn = chk.ok ? chk.warns.join(' ') : 'Esta permuta não pode mais ser aplicada: ' + chk.reason + '.';
+    r._warn = chk.ok ? chk.warns.join(' ') : (permJaAplicada_(r, assignments)
+      ? 'A escala já reflete esta permuta (a aprovação não foi registrada). Clique em Aprovar só para registrar — nenhum e-mail será reenviado.'
+      : 'Esta permuta não pode mais ser aplicada: ' + chk.reason + '.');
   });
 }
 // Monta o cartão de permuta e aplica o bloqueio (permuta + cessão) durante a liberação.
@@ -2815,20 +2873,38 @@ function permSetup_(cfg, month, roster, assignments, dayTypes, released, swapsOk
     await cfg.reload(month);
   };
 }
+// A permuta já está refletida na escala? (toName no dia X e fromName no dia Y.)
+function permJaAplicada_(req, assignments){
+  const sX = assignments[String(req.day)] || [], sY = assignments[String(req.dayB)] || [];
+  return sX.includes(req.toName) && !sX.includes(req.fromName) && sY.includes(req.fromName) && !sY.includes(req.toName);
+}
+// Registra como aprovada uma permuta cuja escala já foi trocada (sem mexer na escala nem reenviar e-mail).
+function permReconcile_(cfg, req){
+  req.status = 'aprovada';
+  req.reconciled = true;
+  logEvent('admin', adminActorLabel_(), 'Registrou permuta já aplicada à escala (' + cfg.label + ') — dia ' + req.day + ': ' + req.toName + ' | dia ' + req.dayB + ': ' + req.fromName);
+  return 'ok';
+}
 // Aprovação do admin. null = admin desistiu (nada alterado); senão atualiza
 // req.status ('aprovada' ou 'erro_ao_aplicar') — quem chama grava a lista.
 async function permApprove_(cfg, req, month){
   const dayTypes = await cfg.getTypes(month);
   let assignments = await cfg.getAssign(month);
   let chk = permCheck_(cfg, assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB);
-  if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+  if(!chk.ok){
+    if(permJaAplicada_(req, assignments)) return permReconcile_(cfg, req);
+    req.status = 'erro_ao_aplicar'; return 'erro';
+  }
   if(chk.warns.length){
     const ok = await askConfirm('⚠️ Atenção:\n' + chk.warns.join('\n') + '\nAprovar a permuta mesmo assim?');
     if(!ok) return null;
     // Relê após a pergunta pra não gravar por cima de mudanças feitas enquanto ela estava aberta.
     assignments = await cfg.getAssign(month);
     chk = permCheck_(cfg, assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB);
-    if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+    if(!chk.ok){
+      if(permJaAplicada_(req, assignments)) return permReconcile_(cfg, req);
+      req.status = 'erro_ao_aplicar'; return 'erro';
+    }
   }
   const slotsX = assignments[String(req.day)] || [];
   const slotsY = assignments[String(req.dayB)] || [];
@@ -2840,7 +2916,7 @@ async function permApprove_(cfg, req, month){
   await cfg.setAssign(month, assignments);
   req.status = 'aprovada';
   logEvent('admin', adminActorLabel_(), 'Aprovou permuta (' + cfg.label + ') — ' + before + ' → dia ' + req.day + ': ' + slotsX.join(', ') + ' | dia ' + req.dayB + ': ' + slotsY.join(', '));
-  backendNotifySwapApproved(cfg.setor, cfg.label, req.month || month, req.day, req.fromName, req.toName, req.dayB);
+  notifyAfterSave_(()=> backendNotifySwapApproved(cfg.setor, cfg.label, req.month || month, req.day, req.fromName, req.toName, req.dayB));
   return 'ok';
 }
 async function permUndo_(cfg, req, list, month){
@@ -5100,10 +5176,10 @@ async function loadSSwapsPanel(month){
       document.getElementById('s-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> sSwapDecide_(btn.dataset.deny, false, month));
     }
 
-    const approved = swaps.filter(r=> r.status === 'aprovada');
+    const approved = swaps.filter(r=> r.status === 'aprovada').sort(swapApprovalOrder_);
     const approvedListEl = document.getElementById('s-swap-approved-list');
     approvedListEl.innerHTML = swapListHtml_(approved, 'Nenhuma troca aprovada ainda neste mês.', req =>
-      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
+      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''), true);
     approvedListEl.querySelectorAll('[data-copyone]').forEach(btn=> btn.onclick = ()=>{
       const req = approved.find(r=> r.id === btn.dataset.copyone);
       if(req) copyTextToClipboard_(swapCopyLine_('SUBSEGOP Serviço Mensal', month, req), btn);
@@ -5178,7 +5254,13 @@ async function sSwapDecide_(id, approve, month){
     if(consecWarn && !(await askConfirm('⚠️ Atenção:\n' + consecWarn + '\nAprovar a cessão mesmo assim?'))) return; // admin desistiu — pedido continua aguardando decisão
     const idx = slots.indexOf(req.fromName);
     if(idx === -1 || slots.includes(req.toName)){
-      req.status = 'erro_ao_aplicar';
+      if(idx === -1 && slots.includes(req.toName)){
+        // A escala já refletia a cessão (aprovação anterior não registrada): só registra.
+        req.status = 'aprovada'; req.reconciled = true;
+        logEvent('admin', adminActorLabel_(), 'Registrou cessão já aplicada à escala — dia ' + req.day + ': ' + req.toName);
+      } else {
+        req.status = 'erro_ao_aplicar';
+      }
     } else {
       const before = slots.slice();
       slots[idx] = req.toName;
@@ -5187,14 +5269,14 @@ async function sSwapDecide_(id, approve, month){
       req.status = 'aprovada';
       // SUBSEGOP Serviço Mensal não distingue tipo de serviço (sem ORD/RAS) — typeLabel fica de fora.
       logEvent('admin', 'Admin', 'Aprovou troca (SUBSEGOP Serviço Mensal) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
-      backendNotifySwapApproved('subsegop', 'SUBSEGOP Serviço Mensal', req.month || month, req.day, req.fromName, req.toName);
+      notifyAfterSave_(()=> backendNotifySwapApproved('subsegop', 'SUBSEGOP Serviço Mensal', req.month || month, req.day, req.fromName, req.toName));
     }
   } else {
     req.status = 'recusada_admin';
     logEvent('admin', 'Admin', 'Recusou troca do dia ' + req.day + ' (' + req.fromName + ' → ' + req.toName + ') (SUBSEGOP Serviço Mensal)');
   }
   req.decidedAt = new Date().toISOString();
-  await setSSwaps(month, list);
+  if(!(await saveDecidedSwap_(setSSwaps, month, list, req, 's-swap-admin-status'))){ await loadSSwapsPanel(month); return; }
   showSwapDecideStatus_('s-swap-admin-status', req);
   await loadSSwapsPanel(month);
   await renderSCalendarList().catch(()=>{});
@@ -6224,10 +6306,10 @@ async function loadCSwapsPanel(month){
       document.getElementById('c-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> cSwapDecide_(btn.dataset.deny, false, month));
     }
 
-    const approved = swaps.filter(r=> r.status === 'aprovada');
+    const approved = swaps.filter(r=> r.status === 'aprovada').sort(swapApprovalOrder_);
     const approvedListEl = document.getElementById('c-swap-approved-list');
     approvedListEl.innerHTML = swapListHtml_(approved, 'Nenhuma troca aprovada ainda neste mês.', req =>
-      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
+      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''), true);
     approvedListEl.querySelectorAll('[data-copyone]').forEach(btn=> btn.onclick = ()=>{
       const req = approved.find(r=> r.id === btn.dataset.copyone);
       if(req) copyTextToClipboard_(swapCopyLine_('CEMADEN', month, req), btn);
@@ -6288,7 +6370,13 @@ async function cSwapDecide_(id, approve, month){
     if(consecWarn && !(await askConfirm('⚠️ Atenção:\n' + consecWarn + '\nAprovar a cessão mesmo assim?'))) return; // admin desistiu — pedido continua aguardando decisão
     const idx = slots.indexOf(req.fromName);
     if(idx === -1 || slots.includes(req.toName)){
-      req.status = 'erro_ao_aplicar';
+      if(idx === -1 && slots.includes(req.toName)){
+        // A escala já refletia a cessão (aprovação anterior não registrada): só registra.
+        req.status = 'aprovada'; req.reconciled = true;
+        logEvent('admin', adminActorLabel_(), 'Registrou cessão já aplicada à escala — dia ' + req.day + ': ' + req.toName);
+      } else {
+        req.status = 'erro_ao_aplicar';
+      }
     } else {
       const before = slots.slice();
       slots[idx] = req.toName;
@@ -6297,14 +6385,14 @@ async function cSwapDecide_(id, approve, month){
       req.status = 'aprovada';
       // CEMADEN não distingue tipo de serviço (sem ORD/RAS) — typeLabel fica de fora.
       logEvent('admin', 'Admin', 'Aprovou troca (CEMADEN) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
-      backendNotifySwapApproved('cemaden', 'CEMADEN', req.month || month, req.day, req.fromName, req.toName);
+      notifyAfterSave_(()=> backendNotifySwapApproved('cemaden', 'CEMADEN', req.month || month, req.day, req.fromName, req.toName));
     }
   } else {
     req.status = 'recusada_admin';
     logEvent('admin', 'Admin', 'Recusou troca do dia ' + req.day + ' (' + req.fromName + ' → ' + req.toName + ') (CEMADEN)');
   }
   req.decidedAt = new Date().toISOString();
-  await setCSwaps(month, list);
+  if(!(await saveDecidedSwap_(setCSwaps, month, list, req, 'c-swap-admin-status'))){ await loadCSwapsPanel(month); return; }
   showSwapDecideStatus_('c-swap-admin-status', req);
   await loadCSwapsPanel(month);
   await renderCCalendarList().catch(()=>{});
@@ -7353,10 +7441,10 @@ async function loadENSwapsPanel(month){
       document.getElementById('en-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> enSwapDecide_(btn.dataset.deny, false, month));
     }
 
-    const approved = swaps.filter(r=> r.status === 'aprovada');
+    const approved = swaps.filter(r=> r.status === 'aprovada').sort(swapApprovalOrder_);
     const approvedListEl = document.getElementById('en-swap-approved-list');
     approvedListEl.innerHTML = swapListHtml_(approved, 'Nenhuma troca aprovada ainda neste mês.', req =>
-      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
+      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''), true);
     approvedListEl.querySelectorAll('[data-copyone]').forEach(btn=> btn.onclick = ()=>{
       const req = approved.find(r=> r.id === btn.dataset.copyone);
       if(req) copyTextToClipboard_(swapCopyLine_('Adm Comitê El Niño', month, req), btn);
@@ -7417,7 +7505,13 @@ async function enSwapDecide_(id, approve, month){
     if(consecWarn && !(await askConfirm('⚠️ Atenção:\n' + consecWarn + '\nAprovar a cessão mesmo assim?'))) return; // admin desistiu — pedido continua aguardando decisão
     const idx = slots.indexOf(req.fromName);
     if(idx === -1 || slots.includes(req.toName)){
-      req.status = 'erro_ao_aplicar';
+      if(idx === -1 && slots.includes(req.toName)){
+        // A escala já refletia a cessão (aprovação anterior não registrada): só registra.
+        req.status = 'aprovada'; req.reconciled = true;
+        logEvent('admin', adminActorLabel_(), 'Registrou cessão já aplicada à escala — dia ' + req.day + ': ' + req.toName);
+      } else {
+        req.status = 'erro_ao_aplicar';
+      }
     } else {
       const before = slots.slice();
       slots[idx] = req.toName;
@@ -7426,14 +7520,14 @@ async function enSwapDecide_(id, approve, month){
       req.status = 'aprovada';
       // Adm Comitê El Niño não distingue tipo de serviço (sem ORD/RAS) — typeLabel fica de fora.
       logEvent('admin', 'Admin', 'Aprovou troca (Adm Comitê El Niño) — dia ' + req.day + ': ' + before.join(', ') + ' → ' + slots.join(', '));
-      backendNotifySwapApproved('cemaden', 'Adm Comitê El Niño', req.month || month, req.day, req.fromName, req.toName);
+      notifyAfterSave_(()=> backendNotifySwapApproved('cemaden', 'Adm Comitê El Niño', req.month || month, req.day, req.fromName, req.toName));
     }
   } else {
     req.status = 'recusada_admin';
     logEvent('admin', 'Admin', 'Recusou troca do dia ' + req.day + ' (' + req.fromName + ' → ' + req.toName + ') (Adm Comitê El Niño)');
   }
   req.decidedAt = new Date().toISOString();
-  await setENSwaps(month, list);
+  if(!(await saveDecidedSwap_(setENSwaps, month, list, req, 'en-swap-admin-status'))){ await loadENSwapsPanel(month); return; }
   showSwapDecideStatus_('en-swap-admin-status', req);
   await loadENSwapsPanel(month);
   await renderENCalendarList().catch(()=>{});
@@ -8415,10 +8509,10 @@ async function loadNSwapsPanel(month){
       document.getElementById('n-swap-admin-list').querySelectorAll('[data-deny]').forEach(btn=> btn.onclick = ()=> nSwapDecide_(btn.dataset.deny, false, month));
     }
 
-    const approved = swaps.filter(r=> r.status === 'aprovada');
+    const approved = swaps.filter(r=> r.status === 'aprovada').sort(swapApprovalOrder_);
     const approvedListEl = document.getElementById('n-swap-approved-list');
     approvedListEl.innerHTML = swapListHtml_(approved, 'Nenhuma troca aprovada ainda neste mês.', req =>
-      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''));
+      `<button ${SWAP_BTN_NEUTRAL_} data-copyone="${req.id}">📋 Copiar</button>` + ((isAdmin && (isCurrentMonth || isNextMonth)) ? `<button ${SWAP_BTN_WARN_} data-undo="${req.id}">↩️ Desfazer</button>` : ''), true);
     approvedListEl.querySelectorAll('[data-copyone]').forEach(btn=> btn.onclick = ()=>{
       const req = approved.find(r=> r.id === btn.dataset.copyone);
       if(req) copyTextToClipboard_(swapCopyLine_('NIIAD', month, req), btn);
@@ -8483,7 +8577,16 @@ async function nSwapDecide_(id, approve, month){
     if(consecWarn && !(await askConfirm('⚠️ Atenção:\n' + consecWarn + '\nAprovar a cessão mesmo assim?'))) return; // admin desistiu — pedido continua aguardando decisão
     const idx = slots.findIndex(raw=> nSlotName_(raw) === req.fromName);
     if(idx === -1 || nSlotNames_(slots).includes(req.toName)){
-      req.status = 'erro_ao_aplicar';
+      if(idx === -1 && nSlotNames_(slots).includes(req.toName)){
+        // A escala já refletia a cessão (aprovação anterior não registrada): só registra.
+        const sTo = slots.map(nNormalizeSlot_).find(x=> x && x.name === req.toName);
+        req.status = 'aprovada'; req.reconciled = true;
+        req.typeLabel = (sTo && sTo.ord) ? 'ORD' : 'RAS';
+        req.fromOrd = !!(sTo && sTo.ord);
+        logEvent('admin', adminActorLabel_(), 'Registrou cessão já aplicada à escala (NIIAD) — dia ' + req.day + ': ' + req.toName);
+      } else {
+        req.status = 'erro_ao_aplicar';
+      }
     } else {
       // A marcação ORD/RAS é uma escolha pessoal de cota (feita por quem
       // assume a vaga), não uma propriedade fixa do dia — então não pode
@@ -8502,14 +8605,14 @@ async function nSwapDecide_(id, approve, month){
       req.typeLabel = isOrd ? 'ORD' : 'RAS'; // NIIAD: só é ORD quando a vaga é Ordinário; preto e vermelho são RAS.
       req.fromOrd = !!norm.ord; // marcação que fromName tinha antes — usada pra restaurar certo se a troca for desfeita.
       logEvent('admin', 'Admin', 'Aprovou cessão (NIIAD) — dia ' + req.day + ': ' + before + ' → ' + nSlotNames_(slots).join(', ') + ' (' + req.typeLabel + ' acompanha o dia, para ' + req.toName + ')');
-      backendNotifySwapApproved('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName);
+      notifyAfterSave_(()=> backendNotifySwapApproved('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName));
     }
   } else {
     req.status = 'recusada_admin';
     logEvent('admin', 'Admin', 'Recusou troca do dia ' + req.day + ' (' + req.fromName + ' → ' + req.toName + ') (NIIAD)');
   }
   req.decidedAt = new Date().toISOString();
-  await setNSwaps(month, list);
+  if(!(await saveDecidedSwap_(setNSwaps, month, list, req, 'n-swap-admin-status'))){ await loadNSwapsPanel(month); return; }
   showSwapDecideStatus_('n-swap-admin-status', req);
   await loadNSwapsPanel(month);
   await renderNCalendarList().catch(()=>{});
@@ -8748,7 +8851,7 @@ async function nPermutaApprove_(req, month){
   req.fromOrd = chk.tA;
   req.toOrd = chk.tB;
   logEvent('admin', adminActorLabel_(), 'Aprovou permuta (NIIAD) — ' + before + ' → dia ' + req.day + ': ' + nSlotNames_(slotsX).join(', ') + ' | dia ' + req.dayB + ': ' + nSlotNames_(slotsY).join(', '));
-  backendNotifySwapApproved('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName, req.dayB);
+  notifyAfterSave_(()=> backendNotifySwapApproved('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName, req.dayB));
   return 'ok';
 }
 
@@ -8807,9 +8910,18 @@ function nTipoCheck_(assignments, dayTypes, month, name, dayOrd, dayRas){
   return { ok:true, warns, effect: nCountsText_(before) + ' → ' + nCountsText_(post) };
 }
 
+// A troca de tipo já está refletida na escala? (dia 'day' agora RAS e dia 'dayB' agora ORD para a pessoa.)
+function nTipoJaAplicada_(req, assignments){
+  const o = (assignments[String(req.day)] || []).map(nNormalizeSlot_).find(s=> s && s.name === req.fromName);
+  const r = (assignments[String(req.dayB)] || []).map(nNormalizeSlot_).find(s=> s && s.name === req.fromName);
+  return !!o && !o.ord && !!r && !!r.ord;
+}
 function nTipoInfo_(req, assignments, dayTypes, month){
   const chk = nTipoCheck_(assignments, dayTypes, month, req.fromName, req.day, req.dayB);
-  if(!chk.ok) return { warn: 'Este pedido não pode mais ser aplicado: ' + chk.reason + '.', info: '' };
+  if(!chk.ok){
+    if(nTipoJaAplicada_(req, assignments)) return { warn: 'A escala já reflete esta troca de tipo (a aprovação não foi registrada). Clique em Aprovar só para registrar — nenhum e-mail será reenviado.', info: '' };
+    return { warn: 'Este pedido não pode mais ser aplicado: ' + chk.reason + '.', info: '' };
+  }
   return { warn: chk.warns.join(' '), info: 'Efeito nas cotas de ' + req.fromName + ': ' + chk.effect + '.' };
 }
 
@@ -8873,13 +8985,27 @@ async function nTipoApprove_(req, month){
   const dayTypes = await getNDayTypes(month);
   let assignments = await getNAssignments(month);
   let chk = nTipoCheck_(assignments, dayTypes, month, req.fromName, req.day, req.dayB);
-  if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+  if(!chk.ok){
+    if(nTipoJaAplicada_(req, assignments)){
+      req.status = 'aprovada'; req.reconciled = true;
+      logEvent('admin', adminActorLabel_(), 'Registrou troca de tipo já aplicada à escala (NIIAD) — ' + req.fromName + ': dia ' + req.day + ' RAS, dia ' + req.dayB + ' ORD');
+      return 'ok';
+    }
+    req.status = 'erro_ao_aplicar'; return 'erro';
+  }
   if(chk.warns.length){
     const ok = await askConfirm('⚠️ Atenção:\n' + chk.warns.join('\n') + '\nAprovar a troca de tipo mesmo assim?');
     if(!ok) return null;
     assignments = await getNAssignments(month); // relê: nada pode ter sido sobrescrito enquanto a pergunta estava aberta
     chk = nTipoCheck_(assignments, dayTypes, month, req.fromName, req.day, req.dayB);
-    if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+    if(!chk.ok){
+      if(nTipoJaAplicada_(req, assignments)){
+        req.status = 'aprovada'; req.reconciled = true;
+        logEvent('admin', adminActorLabel_(), 'Registrou troca de tipo já aplicada à escala (NIIAD) — ' + req.fromName + ': dia ' + req.day + ' RAS, dia ' + req.dayB + ' ORD');
+        return 'ok';
+      }
+      req.status = 'erro_ao_aplicar'; return 'erro';
+    }
   }
   const setOrd = (day, isOrd)=>{
     const slots = assignments[String(day)] || [];
@@ -8892,7 +9018,7 @@ async function nTipoApprove_(req, month){
   await setNAssignments(month, assignments);
   req.status = 'aprovada';
   logEvent('admin', adminActorLabel_(), 'Aprovou troca de tipo (NIIAD) — ' + req.fromName + ': dia ' + req.day + ' ORD → RAS, dia ' + req.dayB + ' RAS → ORD (' + chk.effect + ')');
-  backendNotifySwapApproved('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName, req.dayB, 'troca_tipo');
+  notifyAfterSave_(()=> backendNotifySwapApproved('niiad', 'NIIAD', req.month || month, req.day, req.fromName, req.toName, req.dayB, 'troca_tipo'));
   return 'ok';
 }
 
