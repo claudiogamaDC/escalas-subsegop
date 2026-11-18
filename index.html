@@ -8606,7 +8606,10 @@ function nPermutaCheck_(assignments, dayTypes, month, nameA, dayX, nameB, dayY, 
 // Aviso mostrado ao admin na lista de pendentes (ver loadNSwapsPanel).
 function nPermutaWarn_(req, assignments, dayTypes, month){
   const chk = nPermutaCheck_(assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB, { skipConsecutive:true });
-  if(!chk.ok) return 'Esta permuta não pode mais ser aplicada: ' + chk.reason + '.';
+  if(!chk.ok){
+    if(nPermutaJaAplicada_(req, assignments)) return 'A escala já reflete esta permuta (a aprovação não foi registrada). Clique em Aprovar só para registrar — nenhum e-mail será reenviado.';
+    return 'Esta permuta não pode mais ser aplicada: ' + chk.reason + '.';
+  }
   return chk.warns.join(' ');
 }
 
@@ -8688,20 +8691,48 @@ function nPermutaSetup_(month, roster, assignments, dayTypes, released, swapsOk)
   };
 }
 
+// A permuta já está refletida na escala? (toName no dia X e fromName no dia Y, e ninguém mais no lugar antigo.)
+function nPermutaJaAplicada_(req, assignments){
+  const sX = (assignments[String(req.day)] || []).map(nNormalizeSlot_).filter(Boolean);
+  const sY = (assignments[String(req.dayB)] || []).map(nNormalizeSlot_).filter(Boolean);
+  const xTemTo = sX.some(s=> s.name === req.toName), xTemFrom = sX.some(s=> s.name === req.fromName);
+  const yTemFrom = sY.some(s=> s.name === req.fromName), yTemTo = sY.some(s=> s.name === req.toName);
+  return xTemTo && !xTemFrom && yTemFrom && !yTemTo;
+}
+// Registra como aprovada uma permuta cuja escala já foi trocada. Não regrava a escala nem reenvia e-mail.
+function nPermutaReconcile_(req, assignments){
+  const sX = (assignments[String(req.day)] || []).map(nNormalizeSlot_).filter(Boolean);
+  const sY = (assignments[String(req.dayB)] || []).map(nNormalizeSlot_).filter(Boolean);
+  req.status = 'aprovada';
+  req.toOrd = !!sX.find(s=> s.name === req.toName).ord;
+  req.fromOrd = !!sY.find(s=> s.name === req.fromName).ord;
+  req.reconciled = true;
+  logEvent('admin', adminActorLabel_(), 'Registrou permuta já aplicada à escala (NIIAD) — dia ' + req.day + ': ' + req.toName + ' | dia ' + req.dayB + ': ' + req.fromName);
+  return 'ok';
+}
+
 // Aprovação do admin. Devolve null se o admin desistiu (nada alterado), senão
 // atualiza req.status ('aprovada' ou 'erro_ao_aplicar') — quem chama grava a lista.
 async function nPermutaApprove_(req, month){
   const dayTypes = await getNDayTypes(month);
   let assignments = await getNAssignments(month);
   let chk = nPermutaCheck_(assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB, { skipConsecutive:true });
-  if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+  if(!chk.ok){
+    // Reparação: a escala já foi trocada numa aprovação anterior, mas o registro do pedido
+    // não foi salvo (continuou "aguardando admin"). Só registra como aprovada, sem mexer na escala.
+    if(nPermutaJaAplicada_(req, assignments)) return nPermutaReconcile_(req, assignments);
+    req.status = 'erro_ao_aplicar'; return 'erro';
+  }
   if(chk.warns.length){
     const ok = await askConfirm('⚠️ Atenção:\n' + chk.warns.join('\n') + '\nAprovar a permuta mesmo assim?');
     if(!ok) return null;
     // Relê após a pergunta pra não gravar por cima de mudanças feitas enquanto ela estava aberta.
     assignments = await getNAssignments(month);
     chk = nPermutaCheck_(assignments, dayTypes, month, req.fromName, req.day, req.toName, req.dayB, { skipConsecutive:true });
-    if(!chk.ok){ req.status = 'erro_ao_aplicar'; return 'erro'; }
+    if(!chk.ok){
+      if(nPermutaJaAplicada_(req, assignments)) return nPermutaReconcile_(req, assignments);
+      req.status = 'erro_ao_aplicar'; return 'erro';
+    }
   }
   const slotsX = assignments[String(req.day)] || [];
   const slotsY = assignments[String(req.dayB)] || [];
