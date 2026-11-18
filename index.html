@@ -2644,9 +2644,9 @@ function swapListHtml_(list, emptyMsg, buttonsFor, keepOrder){
   if(!list.length) return `<p style="color:#64748b;font-size:13px;margin:0;">${emptyMsg}</p>`;
   return (keepOrder ? list.slice() : list.slice().reverse()).map(req=> swapRowHtml_(req, buttonsFor ? buttonsFor(req) : '')).join('');
 }
-// Ordem em que o admin autorizou as trocas (decidedAt é gravado no instante da decisão).
+// Ordem em que o admin autorizou as trocas, das MAIS RECENTES para as mais antigas (decidedAt é gravado no instante da decisão).
 function swapApprovalKey_(r){ return String(r.decidedAt || r.respondedAt || r.createdAt || ''); }
-function swapApprovalOrder_(a, b){ const x = swapApprovalKey_(a), y = swapApprovalKey_(b); return x < y ? -1 : x > y ? 1 : 0; }
+function swapApprovalOrder_(a, b){ const x = swapApprovalKey_(a), y = swapApprovalKey_(b); return x < y ? 1 : x > y ? -1 : 0; }
 // Card "Admin: aplicar troca diretamente" (item novo — admin propõe E
 // autoriza numa ação só, sem esperar quem sai/quem entra aceitar). Genérico
 // pros 4 grupos: cada um só passa sua função XSlotNames_ (todos têm essa
