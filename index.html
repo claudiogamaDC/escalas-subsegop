@@ -2815,7 +2815,7 @@ function permSetup_(cfg, month, roster, assignments, dayTypes, released, swapsOk
   const theirSel = document.getElementById(p + '-perm-theirday-select');
   const previewEl = document.getElementById(p + '-perm-preview');
   const statusEl = document.getElementById(p + '-perm-status');
-  const dayLabel = (d)=> 'Dia ' + d + ' (' + weekdayAbbrev(month, d) + ') — ' + (PERM_TYPE_LABEL_[cfg.dayType(dayTypes, month, Number(d))] || '');
+  const dayLabel = (d)=> 'Dia ' + dayShort_(month, d) + ' (' + weekdayAbbrev(month, d) + ') — ' + (PERM_TYPE_LABEL_[cfg.dayType(dayTypes, month, Number(d))] || '');
   const daysOf = (name)=> Object.keys(assignments)
     .filter(d=> (assignments[d] || []).includes(name))
     .map(Number).sort((a,b)=> a - b);
@@ -5017,6 +5017,7 @@ function sDow_(month, day){
   return new Date(y, m-1, day).getDay(); // 0=Dom .. 6=Sáb
 }
 function sDefaultDayType(month, day){
+  if(day <= leadingHiddenDays_(month)) return 'indisponivel';
   const dow = sDow_(month, day);
   if(dow === 5) return 'sexta';
   return (dow === 0 || dow === 6) ? 'vermelho' : 'preto';
@@ -5468,7 +5469,7 @@ async function renderSCalendarList(preloadedBundle, opts){
     const slots = assignments[String(day)] || [];
     const row = document.createElement('div');
     row.className = 'n-cal-row';
-    const dayLabel = `${String(day).padStart(2,'0')} (${weekdayAbbrev(month, day)})`;
+    const dayLabel = `${dayShort_(month, day)} (${weekdayAbbrev(month, day)})`;
 
     if(type === 'indisponivel'){
       row.innerHTML = `
@@ -5638,7 +5639,7 @@ async function loadSCompiled(month){
   for(let day=1; day<=total; day++){
     const type = sDayType(dayTypes, month, day);
     const slots = assignments[String(day)] || [];
-    const dayLabel = `${String(day).padStart(2,'0')}/${month.split('-')[1]} (${weekdayAbbrev(month, day)})`;
+    const dayLabel = `${dayDM_(month, day)} (${weekdayAbbrev(month, day)})`;
     const cls = 'st-' + type;
     const swappedHere = (swappedByDay_[day] || new Set()).has(slots[0]);
     const n1 = type === 'indisponivel' ? 'Indisponível' : (slots[0] ? swapCellPrefix_(swappedHere) + displayName_(roster.find(p=>p.name===slots[0]) || {name:slots[0]}) : '');
@@ -5716,7 +5717,7 @@ document.getElementById('s-export-csv-btn').onclick = async ()=>{
   for(let day=1; day<=total; day++){
     const type = sDayType(dayTypes, month, day);
     const slots = assignments[String(day)] || [];
-    const dayLabel = String(day).padStart(2,'0') + '/' + month.split('-')[1];
+    const dayLabel = dayDM_(month, day);
     const wd = weekdayAbbrev(month, day);
     const n1 = type === 'indisponivel' ? 'Indisponível' : (slots[0] ? displayName_(roster.find(p=>p.name===slots[0]) || {name:slots[0]}) : '');
     rows.push([dayLabel + ' (' + wd + ')', type, n1]);
@@ -5847,7 +5848,7 @@ async function renderSDayTypesEditor(month, wrapId, preloadedDayTypes){
     box.dataset.day = day;
     box.dataset.type = type;
     box.title = type;
-    box.textContent = day;
+    box.textContent = dayShort_(month, day);
     box.onclick = ()=>{
       const next = CYCLE[(CYCLE.indexOf(box.dataset.type) + 1) % CYCLE.length];
       box.dataset.type = next;
@@ -6027,10 +6028,38 @@ const K_C_OBS = "cemaden_observacoes";
 const MONTH_NAMES = ['Janeiro','Fevereiro','Março','Abril','Maio','Junho','Julho','Agosto','Setembro','Outubro','Novembro','Dezembro'];
 const WEEKDAY_NAMES = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 
-function daysInMonth(yyyyMm){
-  if(!yyyyMm) return 0;
+// Meses "estendidos": dias extras além do fim do calendário, escalados dentro
+// do próprio mês (cotas, trocas, compilada). Ex.: '2026-12': 4 → dezembro/2026
+// vai de 01/12 a 04/01/2027 (dias 32..35 = 01..04/jan). Os dias 01..N do mês
+// seguinte ficam 'indisponivel' na escala dele. Pra reutilizar noutro mês,
+// basta incluir a chave aqui.
+const MONTH_EXTRA_DAYS_ = { '2026-12': 4 };
+function realDaysInMonth_(yyyyMm){
   const [y,m] = yyyyMm.split('-').map(Number);
   return new Date(y, m, 0).getDate();
+}
+function daysInMonth(yyyyMm){
+  if(!yyyyMm) return 0;
+  return realDaysInMonth_(yyyyMm) + (MONTH_EXTRA_DAYS_[yyyyMm] || 0);
+}
+// Quantos dias iniciais deste mês já foram escalados no mês anterior estendido.
+function leadingHiddenDays_(yyyyMm){
+  if(!yyyyMm) return 0;
+  const [y,m] = yyyyMm.split('-').map(Number);
+  const prev = m === 1 ? (y-1) + '-12' : y + '-' + String(m-1).padStart(2,'0');
+  return MONTH_EXTRA_DAYS_[prev] || 0;
+}
+// "05" para dias normais; "01/01" para dias extras (além do fim do mês).
+function dayShort_(yyyyMm, day){
+  const d = Number(day);
+  if(!yyyyMm || d <= realDaysInMonth_(yyyyMm)) return String(d).padStart(2,'0');
+  return dayDM_(yyyyMm, d);
+}
+// Sempre "DD/MM" (resolve dias extras para o mês seguinte).
+function dayDM_(yyyyMm, day){
+  const [y,m] = yyyyMm.split('-').map(Number);
+  const dt = new Date(y, m-1, Number(day));
+  return String(dt.getDate()).padStart(2,'0') + '/' + String(dt.getMonth()+1).padStart(2,'0');
 }
 function monthLabel(yyyyMm){
   if(!yyyyMm) return '';
@@ -6161,6 +6190,7 @@ async function getCBundle_(month){
 }
 
 function cDefaultDayType(month, day){
+  if(day <= leadingHiddenDays_(month)) return 'indisponivel';
   const [y,m] = month.split('-').map(Number);
   const dow = new Date(y, m-1, day).getDay(); // 0=Dom .. 6=Sáb
   return (dow === 0 || dow === 6) ? 'vermelho' : 'preto';
@@ -6573,7 +6603,7 @@ async function renderCCalendarList(preloadedBundle, opts){
     const slots = assignments[String(day)] || [];
     const row = document.createElement('div');
     row.className = 'n-cal-row';
-    const dayLabel = `${String(day).padStart(2,'0')} (${weekdayAbbrev(month, day)})`;
+    const dayLabel = `${dayShort_(month, day)} (${weekdayAbbrev(month, day)})`;
 
     if(type === 'indisponivel'){
       row.innerHTML = `
@@ -6734,7 +6764,7 @@ async function loadCCompiled(month){
   for(let day=1; day<=total; day++){
     const type = cDayType(dayTypes, month, day);
     const slots = assignments[String(day)] || [];
-    const dayLabel = `${String(day).padStart(2,'0')}/${month.split('-')[1]} (${weekdayAbbrev(month, day)})`;
+    const dayLabel = `${dayDM_(month, day)} (${weekdayAbbrev(month, day)})`;
     const cls = 'st-' + type;
     const swappedHere = (swappedByDay_[day] || new Set()).has(slots[0]);
     const n1 = type === 'indisponivel' ? 'Indisponível' : (slots[0] ? swapCellPrefix_(swappedHere) + displayName_(roster.find(p=>p.name===slots[0]) || {name:slots[0]}) : '');
@@ -6794,7 +6824,7 @@ document.getElementById('c-export-csv-btn').onclick = async ()=>{
   for(let day=1; day<=total; day++){
     const type = cDayType(dayTypes, month, day);
     const slots = assignments[String(day)] || [];
-    const dayLabel = String(day).padStart(2,'0') + '/' + month.split('-')[1];
+    const dayLabel = dayDM_(month, day);
     const wd = weekdayAbbrev(month, day);
     const n1 = type === 'indisponivel' ? 'Indisponível' : (slots[0] ? displayName_(roster.find(p=>p.name===slots[0]) || {name:slots[0]}) : '');
     rows.push([dayLabel + ' (' + wd + ')', type, n1]);
@@ -6928,7 +6958,7 @@ async function renderCDayTypesEditor(month, wrapId, preloadedDayTypes){
     box.dataset.day = day;
     box.dataset.type = type;
     box.title = type;
-    box.textContent = day;
+    box.textContent = dayShort_(month, day);
     box.onclick = ()=>{
       const next = CYCLE[(CYCLE.indexOf(box.dataset.type) + 1) % CYCLE.length];
       box.dataset.type = next;
@@ -7296,6 +7326,7 @@ async function getENBundle_(month){
 }
 
 function enDefaultDayType(month, day){
+  if(day <= leadingHiddenDays_(month)) return 'indisponivel';
   const [y,m] = month.split('-').map(Number);
   const dow = new Date(y, m-1, day).getDay(); // 0=Dom .. 6=Sáb
   return (dow === 0 || dow === 6) ? 'vermelho' : 'preto';
@@ -7708,7 +7739,7 @@ async function renderENCalendarList(preloadedBundle, opts){
     const slots = assignments[String(day)] || [];
     const row = document.createElement('div');
     row.className = 'n-cal-row';
-    const dayLabel = `${String(day).padStart(2,'0')} (${weekdayAbbrev(month, day)})`;
+    const dayLabel = `${dayShort_(month, day)} (${weekdayAbbrev(month, day)})`;
 
     if(type === 'indisponivel'){
       row.innerHTML = `
@@ -7869,7 +7900,7 @@ async function loadENCompiled(month){
   for(let day=1; day<=total; day++){
     const type = enDayType(dayTypes, month, day);
     const slots = assignments[String(day)] || [];
-    const dayLabel = `${String(day).padStart(2,'0')}/${month.split('-')[1]} (${weekdayAbbrev(month, day)})`;
+    const dayLabel = `${dayDM_(month, day)} (${weekdayAbbrev(month, day)})`;
     const cls = 'st-' + type;
     const swappedHere = (swappedByDay_[day] || new Set()).has(slots[0]);
     const n1 = type === 'indisponivel' ? 'Indisponível' : (slots[0] ? swapCellPrefix_(swappedHere) + displayName_(roster.find(p=>p.name===slots[0]) || {name:slots[0]}) : '');
@@ -7929,7 +7960,7 @@ document.getElementById('en-export-csv-btn').onclick = async ()=>{
   for(let day=1; day<=total; day++){
     const type = enDayType(dayTypes, month, day);
     const slots = assignments[String(day)] || [];
-    const dayLabel = String(day).padStart(2,'0') + '/' + month.split('-')[1];
+    const dayLabel = dayDM_(month, day);
     const wd = weekdayAbbrev(month, day);
     const n1 = type === 'indisponivel' ? 'Indisponível' : (slots[0] ? displayName_(roster.find(p=>p.name===slots[0]) || {name:slots[0]}) : '');
     rows.push([dayLabel + ' (' + wd + ')', type, n1]);
@@ -8057,7 +8088,7 @@ async function renderENDayTypesEditor(month, wrapId, preloadedDayTypes){
     box.dataset.day = day;
     box.dataset.type = type;
     box.title = type;
-    box.textContent = day;
+    box.textContent = dayShort_(month, day);
     box.onclick = ()=>{
       const next = CYCLE[(CYCLE.indexOf(box.dataset.type) + 1) % CYCLE.length];
       box.dataset.type = next;
@@ -8330,6 +8361,7 @@ async function getNBundle_(month){
 }
 
 function nDefaultDayType(month, day){
+  if(day <= leadingHiddenDays_(month)) return 'indisponivel';
   const [y,m] = month.split('-').map(Number);
   const dow = new Date(y, m-1, day).getDay(); // 0=Dom .. 6=Sáb
   return (dow === 0 || dow === 6) ? 'vermelho' : 'preto';
@@ -8732,7 +8764,7 @@ function nPermutaSetup_(month, roster, assignments, dayTypes, released, swapsOk)
   const statusEl = document.getElementById('n-perm-status');
   const dayLabel = (d, name)=>{
     const s = (assignments[String(d)] || []).map(nNormalizeSlot_).find(x=> x && x.name === name);
-    return 'Dia ' + d + ' (' + weekdayAbbrev(month, d) + ') — ' + nTypeTag_(s && s.ord);
+    return 'Dia ' + dayShort_(month, d) + ' (' + weekdayAbbrev(month, d) + ') — ' + nTypeTag_(s && s.ord);
   };
   const daysOf = (name)=> Object.keys(assignments)
     .filter(d=> nSlotNames_(assignments[d]).includes(name))
@@ -8943,7 +8975,7 @@ function nTipoSetup_(month, assignments, dayTypes, released, swapsOk){
     if(s) mySlots.push({ day: Number(d), ord: !!s.ord });
   });
   mySlots.sort((a,b)=> a.day - b.day);
-  const label = (x)=> 'Dia ' + x.day + ' (' + weekdayAbbrev(month, x.day) + ', ' + nDayType(dayTypes, month, x.day) + ')';
+  const label = (x)=> 'Dia ' + dayShort_(month, x.day) + ' (' + weekdayAbbrev(month, x.day) + ', ' + nDayType(dayTypes, month, x.day) + ')';
   const ords = mySlots.filter(x=> x.ord), rases = mySlots.filter(x=> !x.ord);
   ordSel.innerHTML = ords.length ? ords.map(x=> `<option value="${x.day}">${label(x)}</option>`).join('') : '<option value="">-- você não tem dia ORD --</option>';
   rasSel.innerHTML = rases.length ? rases.map(x=> `<option value="${x.day}">${label(x)}</option>`).join('') : '<option value="">-- você não tem dia RAS --</option>';
@@ -9240,7 +9272,7 @@ async function renderNCalendarList(preloadedBundle, opts){
     const slots = assignments[String(day)] || [];
     const row = document.createElement('div');
     row.className = 'n-cal-row';
-    const dayLabel = `${String(day).padStart(2,'0')} (${weekdayAbbrev(month, day)})`;
+    const dayLabel = `${dayShort_(month, day)} (${weekdayAbbrev(month, day)})`;
 
     const slotVermelhoCls = type === 'vermelho' ? ' vermelho' : '';
     const slotHtml = (slotIdx)=>{
@@ -9420,7 +9452,7 @@ async function loadNCompiled(month){
   for(let day=1; day<=total; day++){
     const type = nDayType(dayTypes, month, day);
     const slots = assignments[String(day)] || [];
-    const dayLabel = `${String(day).padStart(2,'0')}/${month.split('-')[1]} (${weekdayAbbrev(month, day)})`;
+    const dayLabel = `${dayDM_(month, day)} (${weekdayAbbrev(month, day)})`;
     const cls = 'st-' + type;
     const swappedSet = swappedByDay_[day] || new Set();
     const slotLabel = (raw)=>{
@@ -9492,7 +9524,7 @@ document.getElementById('n-export-csv-btn').onclick = async ()=>{
   for(let day=1; day<=total; day++){
     const type = nDayType(dayTypes, month, day);
     const slots = assignments[String(day)] || [];
-    const dayLabel = String(day).padStart(2,'0') + '/' + month.split('-')[1];
+    const dayLabel = dayDM_(month, day);
     const wd = weekdayAbbrev(month, day);
     const slotLabel = (raw)=>{
       const s = nNormalizeSlot_(raw);
@@ -9630,7 +9662,7 @@ async function renderNDayTypesEditor(month, wrapId, preloadedDayTypes){
     box.dataset.day = day;
     box.dataset.type = type;
     box.title = type;
-    box.textContent = day;
+    box.textContent = dayShort_(month, day);
     box.onclick = ()=>{
       const next = box.dataset.type === 'preto' ? 'vermelho' : 'preto';
       box.dataset.type = next;
