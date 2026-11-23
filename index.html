@@ -10648,9 +10648,9 @@ async function loadVisaoDiaPanel(){
     dayEl.addEventListener('click', ()=> schedule_(p));
 
     // Botão "Zerar cotas": põe todas as cotas do efetivo em 0 (só na tela, sem salvar) pro admin
-    // refazer a distribuição do zero. Não mexe em quem está marcado como participante.
+    // refazer a distribuição do zero (só no mês seguinte). Não mexe em quem está marcado como participante.
     const saveBtn_ = document.getElementById(p + '-save-participants-btn');
-    if(saveBtn_ && !document.getElementById(p + '-zero-quotas-btn')){
+    if(saveBtn_ && p.endsWith('-next') && !document.getElementById(p + '-zero-quotas-btn')){
       const z = document.createElement('button');
       z.type = 'button';
       z.id = p + '-zero-quotas-btn';
