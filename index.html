@@ -6034,6 +6034,9 @@ const WEEKDAY_NAMES = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 // seguinte ficam 'indisponivel' na escala dele. Pra reutilizar noutro mês,
 // basta incluir a chave aqui.
 const MONTH_EXTRA_DAYS_ = { '2026-12': 4 };
+// Dias extras que NÃO são escalados em certos setores (CEMADEN e Comitê El Niño):
+// em dez/2026 só vão até 01/01 (dia 32); 02, 03 e 04/01 (dias 33..35) ficam 'indisponivel'.
+function forcedOffDay_(month, day){ return month === '2026-12' && Number(day) >= 33; }
 function realDaysInMonth_(yyyyMm){
   const [y,m] = yyyyMm.split('-').map(Number);
   return new Date(y, m, 0).getDate();
@@ -6196,6 +6199,7 @@ function cDefaultDayType(month, day){
   return (dow === 0 || dow === 6) ? 'vermelho' : 'preto';
 }
 function cDayType(dayTypes, month, day){
+  if(forcedOffDay_(month, day)) return 'indisponivel';
   return dayTypes[String(day)] || cDefaultDayType(month, day);
 }
 
@@ -6949,7 +6953,7 @@ async function renderCDayTypesEditor(month, wrapId, preloadedDayTypes){
   const BORDERS = { preto:'1px solid #9ca3af', vermelho:'none', indisponivel:'none' };
 
   for(let day=1; day<=total; day++){
-    const type = dayTypes[String(day)] || cDefaultDayType(month, day);
+    const type = forcedOffDay_(month, day) ? 'indisponivel' : (dayTypes[String(day)] || cDefaultDayType(month, day));
     const box = document.createElement('div');
     box.className = 'day-num-toggle';
     box.style.background = COLORS[type];
@@ -7332,6 +7336,7 @@ function enDefaultDayType(month, day){
   return (dow === 0 || dow === 6) ? 'vermelho' : 'preto';
 }
 function enDayType(dayTypes, month, day){
+  if(forcedOffDay_(month, day)) return 'indisponivel';
   return dayTypes[String(day)] || enDefaultDayType(month, day);
 }
 
@@ -8079,7 +8084,7 @@ async function renderENDayTypesEditor(month, wrapId, preloadedDayTypes){
   const BORDERS = { preto:'1px solid #9ca3af', vermelho:'none', indisponivel:'none' };
 
   for(let day=1; day<=total; day++){
-    const type = dayTypes[String(day)] || enDefaultDayType(month, day);
+    const type = forcedOffDay_(month, day) ? 'indisponivel' : (dayTypes[String(day)] || enDefaultDayType(month, day));
     const box = document.createElement('div');
     box.className = 'day-num-toggle';
     box.style.background = COLORS[type];
