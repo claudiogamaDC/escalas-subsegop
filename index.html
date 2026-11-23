@@ -6037,6 +6037,8 @@ const MONTH_EXTRA_DAYS_ = { '2026-12': 4 };
 // Dias extras que NÃO são escalados em certos setores (CEMADEN e Comitê El Niño):
 // em dez/2026 só vão até 01/01 (dia 32); 02, 03 e 04/01 (dias 33..35) ficam 'indisponivel'.
 function forcedOffDay_(month, day){ return month === '2026-12' && Number(day) >= 33; }
+// Total de dias exibidos em CEMADEN/Comitê (sem os dias forçados como indisponíveis).
+function daysInMonthOff_(month){ let t = daysInMonth(month); while(t > 0 && forcedOffDay_(month, t)) t--; return t; }
 function realDaysInMonth_(yyyyMm){
   const [y,m] = yyyyMm.split('-').map(Number);
   return new Date(y, m, 0).getDate();
@@ -6555,7 +6557,7 @@ async function renderCCalendarList(preloadedBundle, opts){
     document.getElementById(id('my-quota')).textContent = '';
     return;
   }
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const { roster, dayTypes, assignments, skipped, released } = bundle;
   const isAdmin = currentRole === 'admin';
   const myName = currentUserName;
@@ -6758,7 +6760,7 @@ async function loadCCompiled(month){
     document.getElementById('c-obs-row').textContent = obs || '';
     return;
   }
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const swappedByDay_ = swappedNamesByDay_(swaps);
 
   const filledCount = Object.keys(assignments).filter(d=> (assignments[d]||[]).length > 0).length;
@@ -6823,7 +6825,7 @@ document.getElementById('c-export-csv-btn').onclick = async ()=>{
   const month = (monthSel && monthSel.value) || currentMonthISO_();
   const { roster, dayTypes, assignments, configured } = await getCBundle_(month);
   if(!configured){ alert('Configure o mês de referência antes de exportar.'); return; }
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const rows = [['Dia', 'Tipo', 'Of de Ligação']];
   for(let day=1; day<=total; day++){
     const type = cDayType(dayTypes, month, day);
@@ -6943,7 +6945,7 @@ async function renderCDayTypesEditor(month, wrapId, preloadedDayTypes){
   const wrap = document.getElementById(wrapId);
   wrap.innerHTML = '';
   if(!month) return;
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const dayTypes = preloadedDayTypes || await getCDayTypes(month);
 
   const CYCLE = ['preto', 'vermelho', 'indisponivel'];
@@ -7692,7 +7694,7 @@ async function renderENCalendarList(preloadedBundle, opts){
     document.getElementById(id('my-quota')).textContent = '';
     return;
   }
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const { roster, dayTypes, assignments, skipped, released } = bundle;
   const isAdmin = currentRole === 'admin';
   const myName = currentUserName;
@@ -7895,7 +7897,7 @@ async function loadENCompiled(month){
     document.getElementById('en-obs-row').textContent = obs || '';
     return;
   }
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const swappedByDay_ = swappedNamesByDay_(swaps);
 
   const filledCount = Object.keys(assignments).filter(d=> (assignments[d]||[]).length > 0).length;
@@ -7960,7 +7962,7 @@ document.getElementById('en-export-csv-btn').onclick = async ()=>{
   const month = (monthSel && monthSel.value) || currentMonthISO_();
   const { roster, dayTypes, assignments, configured } = await getENBundle_(month);
   if(!configured){ alert('Configure o mês de referência antes de exportar.'); return; }
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const rows = [['Dia', 'Tipo', 'Participante']];
   for(let day=1; day<=total; day++){
     const type = enDayType(dayTypes, month, day);
@@ -8074,7 +8076,7 @@ async function renderENDayTypesEditor(month, wrapId, preloadedDayTypes){
   const wrap = document.getElementById(wrapId);
   wrap.innerHTML = '';
   if(!month) return;
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const dayTypes = preloadedDayTypes || await getENDayTypes(month);
 
   const CYCLE = ['preto', 'vermelho', 'indisponivel'];
