@@ -10659,9 +10659,7 @@ async function loadVisaoDiaPanel(){
       z.textContent = 'Zerar cotas';
       z.title = 'Zera todas as cotas na tela; depois é só distribuir de novo e salvar.';
       z.addEventListener('click', ()=>{
-        if(!confirm('Zerar TODAS as cotas desta lista?
-
-Isso só limpa a tela — nada muda até você distribuir de novo e clicar em Salvar.')) return;
+        if(!confirm('Zerar TODAS as cotas desta lista?\n\nIsso só limpa a tela — nada muda até você distribuir de novo e clicar em Salvar.')) return;
         listEl.querySelectorAll('input[type=number]').forEach(inp=>{ inp.value = 0; });
         listEl.dispatchEvent(new Event('input', { bubbles:true }));
       });
