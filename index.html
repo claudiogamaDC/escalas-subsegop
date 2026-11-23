@@ -2173,6 +2173,45 @@ sSwapCancel_ = onceBy_(sSwapCancel_);
 sSwapDecide_ = onceBy_(sSwapDecide_);
 sSwapUndo_ = onceBy_(sSwapUndo_);
 sSwapAdminDirect_ = onceBy_(sSwapAdminDirect_);
+// Feedback de "carregando" para os DEMAIS botões (salvar, liberar, adicionar, entrar, exportar...):
+// quando um clique em botão dispara uma chamada ao servidor, o botão fica cinza com "⏳ Aguarde…"
+// até todas as chamadas terminarem, e cliques repetidos nele são ignorados. Botões que não falam com
+// o servidor não mudam em nada. Os botões de troca/permuta já têm controle próprio e ficam de fora.
+(function(){
+  const SKIP = '.tab,[data-guarded],.is-busy,.status-btns button,[data-accept],[data-reject],[data-cancel],[data-approve],[data-deny],[data-undo]';
+  const active = new Map(); // botão -> { label, busyLabel }
+  let pending = 0, lastClick = null, idleTimer = null;
+  const origFetch = window.fetch.bind(window);
+  function mark(b){
+    const label = b.textContent;
+    const busyLabel = label.trim().length <= 3 ? '⏳' : '⏳ Aguarde…';
+    active.set(b, { label, busyLabel });
+    b.classList.add('is-busy'); b.setAttribute('aria-busy', 'true'); b.textContent = busyLabel;
+  }
+  function releaseAll(){
+    active.forEach((info, b)=>{
+      b.classList.remove('is-busy'); b.removeAttribute('aria-busy');
+      if(b.textContent === info.busyLabel) b.textContent = info.label;
+    });
+    active.clear();
+  }
+  window.fetch = function(...args){
+    pending++;
+    clearTimeout(idleTimer);
+    if(lastClick && Date.now() - lastClick.t < 1500 && !active.has(lastClick.b) && lastClick.b.isConnected) mark(lastClick.b);
+    return origFetch(...args).finally(()=>{
+      pending--;
+      if(pending <= 0){ pending = 0; clearTimeout(idleTimer); idleTimer = setTimeout(()=>{ if(pending === 0) releaseAll(); }, 350); }
+    });
+  };
+  document.addEventListener('click', (e)=>{
+    const b = e.target && e.target.closest ? e.target.closest('button') : null;
+    if(!b) return;
+    if(active.has(b)){ e.stopImmediatePropagation(); e.preventDefault(); return; }
+    lastClick = b.matches(SKIP) ? null : { b, t: Date.now() };
+  }, true);
+  setInterval(()=>{ if(pending === 0 && active.size) releaseAll(); }, 60000);
+})();
 cSwapRespond_ = onceBy_(cSwapRespond_);
 cSwapCancel_ = onceBy_(cSwapCancel_);
 cSwapDecide_ = onceBy_(cSwapDecide_);
