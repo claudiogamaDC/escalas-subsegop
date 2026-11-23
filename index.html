@@ -10647,6 +10647,27 @@ async function loadVisaoDiaPanel(){
     ['input','change'].forEach(ev=> listEl.addEventListener(ev, ()=> schedule_(p)));
     dayEl.addEventListener('click', ()=> schedule_(p));
 
+    // Botão "Zerar cotas": põe todas as cotas do efetivo em 0 (só na tela, sem salvar) pro admin
+    // refazer a distribuição do zero. Não mexe em quem está marcado como participante.
+    const saveBtn_ = document.getElementById(p + '-save-participants-btn');
+    if(saveBtn_ && !document.getElementById(p + '-zero-quotas-btn')){
+      const z = document.createElement('button');
+      z.type = 'button';
+      z.id = p + '-zero-quotas-btn';
+      z.className = 'save-btn';
+      z.style.cssText = 'background:#64748b;margin-top:14px;';
+      z.textContent = 'Zerar cotas';
+      z.title = 'Zera todas as cotas na tela; depois é só distribuir de novo e salvar.';
+      z.addEventListener('click', ()=>{
+        if(!confirm('Zerar TODAS as cotas desta lista?
+
+Isso só limpa a tela — nada muda até você distribuir de novo e clicar em Salvar.')) return;
+        listEl.querySelectorAll('input[type=number]').forEach(inp=>{ inp.value = 0; });
+        listEl.dispatchEvent(new Event('input', { bubbles:true }));
+      });
+      saveBtn_.before(z);
+    }
+
     // Aviso ao salvar o efetivo quando as cotas não batem com os dias.
     const btn = document.getElementById(p + '-save-participants-btn');
     if(btn) btn.addEventListener('click', (e)=>{
