@@ -5062,6 +5062,7 @@ function sDefaultDayType(month, day){
   return (dow === 0 || dow === 6) ? 'vermelho' : 'preto';
 }
 function sDayType(dayTypes, month, day){
+  if(forcedOffDay_(month, day)) return 'indisponivel';
   return dayTypes[String(day)] || sDefaultDayType(month, day);
 }
 function sQuotaFor_(entry, type){
@@ -5456,7 +5457,7 @@ async function renderSCalendarList(preloadedBundle, opts){
     document.getElementById(id('my-quota')).textContent = '';
     return;
   }
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const { roster, dayTypes, assignments, skipped, released } = bundle;
   const isAdmin = currentRole === 'admin';
   const myName = currentUserName;
@@ -5668,7 +5669,7 @@ async function loadSCompiled(month){
     document.getElementById('s-obs-row').textContent = obs || '';
     return;
   }
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const swappedByDay_ = swappedNamesByDay_(swaps);
 
   const filledCount = Object.keys(assignments).filter(d=> (assignments[d]||[]).length > 0).length;
@@ -5751,7 +5752,7 @@ document.getElementById('s-export-csv-btn').onclick = async ()=>{
   const month = (monthSel && monthSel.value) || currentMonthISO_();
   const { roster, dayTypes, assignments, configured } = await getSBundle_(month);
   if(!configured){ alert('Configure o mês de referência antes de exportar.'); return; }
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const rows = [['Dia', 'Tipo', 'Serviço Mensal']];
   for(let day=1; day<=total; day++){
     const type = sDayType(dayTypes, month, day);
@@ -5866,7 +5867,7 @@ async function renderSDayTypesEditor(month, wrapId, preloadedDayTypes){
   const wrap = document.getElementById(wrapId);
   wrap.innerHTML = '';
   if(!month) return;
-  const total = daysInMonth(month);
+  const total = daysInMonthOff_(month);
   const dayTypes = preloadedDayTypes || await getSDayTypes(month);
 
   const CYCLE = ['preto', 'sexta', 'vermelho', 'indisponivel'];
@@ -5878,7 +5879,7 @@ async function renderSDayTypesEditor(month, wrapId, preloadedDayTypes){
   const BORDERS = { preto:'1px solid #9ca3af', sexta:'1px solid #f472b6', vermelho:'none', indisponivel:'none' };
 
   for(let day=1; day<=total; day++){
-    const type = dayTypes[String(day)] || sDefaultDayType(month, day);
+    const type = forcedOffDay_(month, day) ? 'indisponivel' : (dayTypes[String(day)] || sDefaultDayType(month, day));
     const box = document.createElement('div');
     box.className = 'day-num-toggle';
     box.style.background = COLORS[type];
@@ -6073,7 +6074,7 @@ const WEEKDAY_NAMES = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb'];
 // seguinte ficam 'indisponivel' na escala dele. Pra reutilizar noutro mês,
 // basta incluir a chave aqui.
 const MONTH_EXTRA_DAYS_ = { '2026-12': 4 };
-// Dias extras que NÃO são escalados em certos setores (CEMADEN e Comitê El Niño):
+// Dias extras que NÃO são escalados em certos setores (SUBSEGOP, CEMADEN e Comitê El Niño):
 // em dez/2026 só vão até 01/01 (dia 32); 02, 03 e 04/01 (dias 33..35) ficam 'indisponivel'.
 function forcedOffDay_(month, day){ return month === '2026-12' && Number(day) >= 33; }
 // Total de dias exibidos em CEMADEN/Comitê (sem os dias forçados como indisponíveis).
